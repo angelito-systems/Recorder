@@ -170,9 +170,52 @@ public sealed record StudioProject
     /// <summary>The output-time span of a source range, trimmed to what survives the cuts; null if fully removed.</summary>
     public (double Start, double End)? OutputRange(double a, double b)
     {
-        var kept = Segments.Select(s => (S: Math.Max(s.Start, a), E: Math.Min(s.End, b))).Where(r => r.E > r.S).ToList();
-        if (kept.Count == 0) return null;
-        return (ToOutput(kept[0].S)!.Value, ToOutput(kept[^1].E)!.Value);
+        // Pieces in output order; consecutive ones join. With reordered clips a range can split apart: the first run wins.
+        // Mapped per clip: a boundary instant belongs to two clips, so ToOutput would be ambiguous here.
+        var pieces = new List<(double S, double E)>();
+        double acc = 0;
+        foreach (var s in Segments)
+        {
+            double ps = Math.Max(s.Start, a), pe = Math.Min(s.End, b);
+            if (pe > ps) pieces.Add((acc + ps - s.Start, acc + pe - s.Start));
+            acc += s.Duration;
+        }
+        pieces.Sort();
+        if (pieces.Count == 0) return null;
+        var run = pieces[0];
+        foreach (var r in pieces.Skip(1))
+            if (r.S - run.E < 1e-6) run.E = Math.Max(run.E, r.E); else break;
+        return run;
+    }
+
+    /// <summary>Moves the clip containing source time t one place earlier (dir -1) or later (+1) in the output.</summary>
+    public StudioProject MoveSegment(double t, int dir)
+    {
+        var i = Segments.FindIndex(s => t >= s.Start && t < s.End);
+        var j = i + Math.Sign(dir);
+        if (i < 0 || j < 0 || j >= Segments.Count) return this;
+        var list = new List<Segment>(Segments);
+        (list[i], list[j]) = (list[j], list[i]);
+        return this with { Segments = list };
+    }
+
+    /// <summary>
+    /// Playback in output order: the clip index to play at source time t, given the one playing (-1 if none).
+    /// Running off the end of the current clip continues with the next in the list; -1 means the end.
+    /// </summary>
+    public int PlaybackSegment(int current, double t)
+    {
+        if (current >= 0 && current < Segments.Count)
+        {
+            var c = Segments[current];
+            if (t >= c.Start - 0.05 && t < c.End) return current;
+            if (t >= c.End && t < c.End + 0.5) return current + 1 < Segments.Count ? current + 1 : -1; // natural run-off
+        }
+        var inside = Segments.FindIndex(s => t >= s.Start - 0.02 && t < s.End);
+        if (inside >= 0) return inside;
+        // In a removed range (e.g. after a seek): the next kept source range, else the end.
+        var next = Segments.Select((s, k) => (s, k)).Where(x => x.s.Start > t).OrderBy(x => x.s.Start).FirstOrDefault();
+        return next.s == null ? -1 : next.k;
     }
 
     /// <summary>SRT in output time, i.e. aligned with the exported video. Cues inside removed ranges are dropped.</summary>

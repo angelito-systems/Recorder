@@ -26,19 +26,19 @@ Estado verificado el 2026-11-03 en i7-13650HX / RTX 4050 Laptop / Intel UHD, Win
 - Subtítulos: además de incrustados (opcional), MP4 y MKV llevan una pista suave que el reproductor puede activar o quitar (mov_text / srt), en tiempos del video exportado.
 - Editor de la lista de atajos (botón «Editar lista…» del grabador): atajos adicionales y programas excluidos, guardados en keys.json. Nunca se aceptan combinaciones que escriben texto (letras, Mayús+letra, Ctrl+Alt+letra = AltGr), tampoco si se editan a mano en keys.json.
 - Textos, subtítulos incrustados y atajos aparecen y desaparecen con un fundido (0,2 s, o la mitad si duran menos de 0,4 s), igual en la vista previa al reproducir y en la exportación.
+- Reordenar clips: botones «◀ Clip» / «Clip ▶» (Ctrl+←/→) mueven el clip bajo el cabezal en el orden del video; el timeline sigue en tiempo de grabación y cada clip muestra su número de orden. Reproducción, exportación, SRT y recortes siguen ese orden; zooms, textos y anotaciones viajan con su contenido.
 - Exportación MP4 AV1: NVENC/QSV/AMF si la GPU lo soporta, si no libaom (CPU, lento). Verificado que el archivo se decodifica entero sin errores con FFmpeg; en Windows el reproductor necesita la extensión AV1 de Microsoft Store, y los navegadores y móviles recientes lo reproducen.
 - 11 pruebas automáticas (zoom, auto-zoom, proyecto, historial, recuperación de `.bak`, formato de cursor, layout, exportación FFmpeg real con cortes+zoom+clics+webcam+audio).
 
 ## Pendiente, por prioridad
 
 1. Ventana: si se redimensiona durante la grabación se recorta/rellena (no se escala). Siguiente paso de rendimiento posible: codificar en proceso con Media Foundation desde la textura (sin copia a CPU ni tubería).
-2. Reordenar clips (requiere pasar el timeline de tiempo de origen a tiempo de salida: vista previa, arrastres y rangos asumen orden de origen).
-3. Imágenes/logotipos, numeración de pasos y callouts; animaciones de entrada/salida.
-4. Cursor ampliado/suavizado en posproducción (requiere grabar sin cursor y dibujarlo, `draw_mouse=0` + `sendcmd`).
-5. Compositor GPU propio (D3D11) para vista previa y exportación a la vez (hoy la cámara usa `perspective` en CPU: ~230 fps a 1080p).
-6. Seguimiento automático del cursor como propuesta de encuadre.
-7. Firma de código, actualizaciones firmadas.
-8. Multimonitor: el emparejamiento salida DXGI ↔ monitor es por tamaño y orden; **no verificado** con varios monitores (este equipo tiene uno).
+2. Imágenes/logotipos, numeración de pasos y callouts; animaciones de entrada/salida.
+3. Cursor ampliado/suavizado en posproducción (requiere grabar sin cursor y dibujarlo, `draw_mouse=0` + `sendcmd`).
+4. Compositor GPU propio (D3D11) para vista previa y exportación a la vez (hoy la cámara usa `perspective` en CPU: ~230 fps a 1080p).
+5. Seguimiento automático del cursor como propuesta de encuadre.
+6. Firma de código, actualizaciones firmadas.
+7. Multimonitor: el emparejamiento salida DXGI ↔ monitor es por tamaño y orden; **no verificado** con varios monitores (este equipo tiene uno).
 
 ## No se hará sin requisitos
 
