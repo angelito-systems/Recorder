@@ -129,6 +129,11 @@ public sealed record EncoderChoice(string Name, string CaptureFilter, bool Hardw
             "h264_nvenc" or "hevc_nvenc" => ["-c:v", Name, "-preset", new[] { "p2", "p4", "p6", "p7" }[i], "-rc", "vbr", "-cq", cq, "-b:v", "0"],
             "h264_qsv" or "hevc_qsv" => ["-c:v", Name, "-preset", new[] { "veryfast", "medium", "slower", "veryslow" }[i], "-global_quality", cq],
             "h264_amf" or "hevc_amf" => ["-c:v", Name, "-quality", new[] { "speed", "balanced", "quality", "quality" }[i], "-rc", "cqp", "-qp_i", cq, "-qp_p", cq],
+            "av1_nvenc" => ["-c:v", Name, "-preset", new[] { "p2", "p4", "p6", "p7" }[i], "-rc", "vbr", "-cq", new[] { "36", "30", "26", "22" }[i], "-b:v", "0"],
+            "av1_qsv" => ["-c:v", Name, "-preset", new[] { "veryfast", "medium", "slower", "veryslow" }[i], "-global_quality", cq],
+            "av1_amf" => ["-c:v", Name, "-quality", new[] { "speed", "balanced", "quality", "quality" }[i], "-rc", "cqp", "-qp_i", cq, "-qp_p", cq],
+            // CPU AV1 is slow even at the fastest settings; it's the last resort when no GPU can encode AV1.
+            "libaom-av1" => ["-c:v", Name, "-cpu-used", new[] { "8", "7", "6", "5" }[i], "-row-mt", "1", "-crf", new[] { "40", "34", "30", "26" }[i], "-b:v", "0"],
             "libx265" => ["-c:v", Name, "-preset", new[] { "veryfast", "medium", "slow", "slower" }[i], "-crf", cq],
             _ => ["-c:v", "libx264", "-preset", new[] { "veryfast", "medium", "slow", "slower" }[i], "-crf", cq],
         };
@@ -174,15 +179,19 @@ public static class EncoderProbe
         return Cpu;
     }
 
-    public static async Task<EncoderChoice> ForExportAsync(bool hevc = false)
+    public static readonly EncoderChoice CpuAv1 = new("libaom-av1", "", false);
+
+    /// <summary>Best working encoder for a video export format (H.264 for non-video formats).</summary>
+    public static async Task<EncoderChoice> ForExportAsync(ExportFormat format = ExportFormat.Mp4H264)
     {
-        foreach (var name in hevc ? new[] { "hevc_nvenc", "hevc_qsv", "hevc_amf" } : new[] { "h264_nvenc", "h264_qsv", "h264_amf" })
+        var codec = format switch { ExportFormat.Mp4Hevc => "hevc", ExportFormat.Mp4Av1 => "av1", _ => "h264" };
+        foreach (var name in new[] { "nvenc", "qsv", "amf" }.Select(hw => $"{codec}_{hw}"))
         {
             var c = new EncoderChoice(name, "", true);
             if (await Works(["-loglevel", "error", "-f", "lavfi", "-i", "color=s=640x360:d=0.2", "-pix_fmt", c.CpuPixFmt, .. c.QualityArgs(ExportQuality.Fast), "-f", "null", "-"]))
                 return c;
         }
-        return hevc ? CpuHevc : Cpu;
+        return codec switch { "hevc" => CpuHevc, "av1" => CpuAv1, _ => Cpu };
     }
 
     private static async Task<bool> Works(IEnumerable<string> args)

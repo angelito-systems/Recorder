@@ -55,6 +55,19 @@ public class FormatTests
     }
 
     [Fact]
+    public async Task Mp4Av1DecodesBack()
+    {
+        var (dir, m, p) = await Session();
+        var enc = await EncoderProbe.ForExportAsync(ExportFormat.Mp4Av1); // GPU if this machine has one, else libaom
+        var out_ = await Export(dir, m, p with { Export = new ExportSettings(Format: ExportFormat.Mp4Av1, Quality: ExportQuality.Fast) }, enc);
+        Assert.Contains("Video: av1", await Info(out_));
+        // Playback check: the file must decode end to end without errors.
+        var (code, log) = await FfmpegProcess.RunAsync(["-v", "error", "-i", out_, "-f", "null", "-"]);
+        Assert.Equal(0, code);
+        Assert.True(string.IsNullOrWhiteSpace(log), log);
+    }
+
+    [Fact]
     public async Task WavIsAudioOnlyWithCutsApplied()
     {
         var (dir, m, p) = await Session();

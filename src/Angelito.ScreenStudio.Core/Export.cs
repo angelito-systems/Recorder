@@ -264,6 +264,7 @@ public static class Exporter
         if (p.Export.Format == ExportFormat.Png) return (long)(w * h * 1.5);
         var bpp = p.Export.Quality switch { ExportQuality.Fast => 0.03, ExportQuality.High => 0.08, ExportQuality.Max => 0.12, _ => 0.05 };
         if (p.Export.Format == ExportFormat.Mp4Hevc) bpp *= 0.65;
+        if (p.Export.Format == ExportFormat.Mp4Av1) bpp *= 0.5;
         return (long)(dur * (bpp * w * h * Fps(p, m) + 192_000) / 8);
     }
 

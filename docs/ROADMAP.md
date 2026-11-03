@@ -24,6 +24,7 @@ Estado verificado el 2026-11-03 en i7-13650HX / RTX 4050 Laptop / Intel UHD, Win
 - Atajos globales: Ctrl+Mayús+F9 pausa/reanuda, Ctrl+Mayús+F10 graba/detiene (si otra app ya los usa se anota en el log).
 - Timeline: barra de desplazamiento cuando está ampliado; al arrastrar o recorrer cerca de un borde se desplaza solo (con cada movimiento del ratón).
 - Subtítulos: además de incrustados (opcional), MP4 y MKV llevan una pista suave que el reproductor puede activar o quitar (mov_text / srt), en tiempos del video exportado.
+- Exportación MP4 AV1: NVENC/QSV/AMF si la GPU lo soporta, si no libaom (CPU, lento). Verificado que el archivo se decodifica entero sin errores con FFmpeg; en Windows el reproductor necesita la extensión AV1 de Microsoft Store, y los navegadores y móviles recientes lo reproducen.
 - 11 pruebas automáticas (zoom, auto-zoom, proyecto, historial, recuperación de `.bak`, formato de cursor, layout, exportación FFmpeg real con cortes+zoom+clics+webcam+audio).
 
 ## Pendiente, por prioridad
@@ -34,7 +35,7 @@ Estado verificado el 2026-11-03 en i7-13650HX / RTX 4050 Laptop / Intel UHD, Win
 4. Animaciones de entrada/salida para atajos y textos; editor visual de la lista de atajos permitidos.
 5. Cursor ampliado/suavizado en posproducción (requiere grabar sin cursor y dibujarlo, `draw_mouse=0` + `sendcmd`).
 6. Compositor GPU propio (D3D11) para vista previa y exportación a la vez (hoy la cámara usa `perspective` en CPU: ~230 fps a 1080p).
-7. AV1 (av1_nvenc/qsv/amf existen en esta compilación; falta validar compatibilidad de reproducción); seguimiento automático del cursor como propuesta de encuadre.
+7. Seguimiento automático del cursor como propuesta de encuadre.
 8. Firma de código, actualizaciones firmadas.
 9. Multimonitor: el emparejamiento salida DXGI ↔ monitor es por tamaño y orden; **no verificado** con varios monitores (este equipo tiene uno).
 
