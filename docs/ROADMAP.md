@@ -21,20 +21,21 @@ Estado verificado el 2026-11-03 en i7-13650HX / RTX 4050 Laptop / Intel UHD, Win
 - Textos y subtítulos: añadir/quitar, editar contenido multilínea, tamaño, color, fondo, negrita, inicio/fin, arrastrar en la vista previa; subtítulos con estilo común, importar/exportar SRT con tiempos ajustados a los cortes, incrustación opcional. La vista previa y el render usan la misma fuente (Segoe UI) y la misma geometría; verificado comparando una captura del editor con un fotograma exportado.
 - Exportación: MP4 H.264, MP4 HEVC/H.265 (etiqueta hvc1), MKV H.264, WAV (solo audio, sin decodificar video) y PNG (fotograma del cabezal, mismo pipeline). Resolución, 4 calidades, FPS de salida, presets (Rápido, Equilibrado, Alta, Máxima, YouTube 4K, Redes sociales 9:16) y tamaño estimado (aproximado: la codificación es por calidad). Codificador detectado por hardware para H.264 y HEVC (NVENC/QSV/AMF, CPU x264/x265). Cola de exportación: trabajos secuenciales con copia fija del proyecto, progreso, cancelación, errores visibles y registrados; se puede seguir editando. Verificado: HEVC (NVENC) + WAV + PNG encolados desde la app.
 - No hay reanudación de trabajos interrumpidos (no existe un diseño de checkpoints; un trabajo cancelado se repite completo). La cola no persiste al cerrar la app.
+- Atajos globales: Ctrl+Mayús+F9 pausa/reanuda, Ctrl+Mayús+F10 graba/detiene (si otra app ya los usa se anota en el log).
+- Timeline: barra de desplazamiento cuando está ampliado; al arrastrar o recorrer cerca de un borde se desplaza solo (con cada movimiento del ratón).
 - 11 pruebas automáticas (zoom, auto-zoom, proyecto, historial, recuperación de `.bak`, formato de cursor, layout, exportación FFmpeg real con cortes+zoom+clics+webcam+audio).
 
 ## Pendiente, por prioridad
 
 1. Ventana: si se redimensiona durante la grabación se recorta/rellena (no se escala). Siguiente paso de rendimiento posible: codificar en proceso con Media Foundation desde la textura (sin copia a CPU ni tubería).
-2. Atajo global para pausar/detener.
-3. Reordenar clips; barra de desplazamiento visible y auto-desplazamiento al arrastrar cerca del borde.
-4. Imágenes/logotipos, numeración de pasos y callouts; animaciones de entrada/salida; pista de subtítulos suave (mov_text) además de incrustada.
-5. Animaciones de entrada/salida para atajos y textos; editor visual de la lista de atajos permitidos.
-6. Cursor ampliado/suavizado en posproducción (requiere grabar sin cursor y dibujarlo, `draw_mouse=0` + `sendcmd`).
-7. Compositor GPU propio (D3D11) para vista previa y exportación a la vez (hoy la cámara usa `perspective` en CPU: ~230 fps a 1080p).
-8. AV1 (av1_nvenc/qsv/amf existen en esta compilación; falta validar compatibilidad de reproducción); seguimiento automático del cursor como propuesta de encuadre.
-9. Instalador (MSIX o WiX), icono, firma de código, actualizaciones firmadas.
-10. Multimonitor: el emparejamiento salida DXGI ↔ monitor es por tamaño y orden; **no verificado** con varios monitores (este equipo tiene uno).
+2. Reordenar clips (requiere pasar el timeline de tiempo de origen a tiempo de salida: vista previa, arrastres y rangos asumen orden de origen).
+3. Imágenes/logotipos, numeración de pasos y callouts; animaciones de entrada/salida; pista de subtítulos suave (mov_text) además de incrustada.
+4. Animaciones de entrada/salida para atajos y textos; editor visual de la lista de atajos permitidos.
+5. Cursor ampliado/suavizado en posproducción (requiere grabar sin cursor y dibujarlo, `draw_mouse=0` + `sendcmd`).
+6. Compositor GPU propio (D3D11) para vista previa y exportación a la vez (hoy la cámara usa `perspective` en CPU: ~230 fps a 1080p).
+7. AV1 (av1_nvenc/qsv/amf existen en esta compilación; falta validar compatibilidad de reproducción); seguimiento automático del cursor como propuesta de encuadre.
+8. Firma de código, actualizaciones firmadas.
+9. Multimonitor: el emparejamiento salida DXGI ↔ monitor es por tamaño y orden; **no verificado** con varios monitores (este equipo tiene uno).
 
 ## No se hará sin requisitos
 

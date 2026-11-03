@@ -24,7 +24,23 @@ public partial class RecorderWindow : Window
         InitializeComponent();
         _tick.Tick += (_, _) => UpdateMeters();
         // Keep the recorder visible to the user but out of the captured video.
-        SourceInitialized += (_, _) => Native.SetWindowDisplayAffinity(new WindowInteropHelper(this).Handle, Native.WDA_EXCLUDEFROMCAPTURE);
+        SourceInitialized += (_, _) =>
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            Native.SetWindowDisplayAffinity(hwnd, Native.WDA_EXCLUDEFROMCAPTURE);
+            // Global hotkeys (Ctrl+Shift+F9 pause/resume, Ctrl+Shift+F10 record/stop); freed by Windows when the window is destroyed.
+            const uint CtrlShiftNoRepeat = 0x0002 | 0x0004 | 0x4000;
+            if (!Native.RegisterHotKey(hwnd, 1, CtrlShiftNoRepeat, 0x78) | !Native.RegisterHotKey(hwnd, 2, CtrlShiftNoRepeat, 0x79))
+                App.Log("global hotkey Ctrl+Shift+F9/F10 already taken by another app");
+            HwndSource.FromHwnd(hwnd).AddHook((IntPtr _, int msg, IntPtr id, IntPtr _, ref bool handled) =>
+            {
+                if (msg != 0x0312) return IntPtr.Zero; // WM_HOTKEY
+                handled = true;
+                if (id == 1 && _rec != null && PauseBtn.IsEnabled) OnPause(this, new RoutedEventArgs());
+                if (id == 2 && RecordBtn.IsEnabled) OnRecord(this, new RoutedEventArgs());
+                return IntPtr.Zero;
+            });
+        };
         Loaded += async (_, _) => { await RecoverInterruptedAsync(); await DetectAsync(); };
     }
 

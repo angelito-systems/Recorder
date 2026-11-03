@@ -9,7 +9,7 @@ public partial class EditorWindow
 {
     private enum Row { Segment, Zoom, Text, Cue, Annotation }
 
-    private sealed record DragState(Row Row, int Index, DragMode Mode, double X0, double S0, double E0, string Key)
+    private sealed record DragState(Row Row, int Index, DragMode Mode, double X0, double T0, double S0, double E0, string Key)
     {
         public bool Moved { get; set; }
     }
@@ -103,7 +103,7 @@ public partial class EditorWindow
             if (h.Mode is { } mode)
             {
                 var (s, en) = Items(h.Row)[h.Index];
-                _drag = new DragState(h.Row, h.Index, mode, pos.X, s, en, "drag" + Guid.NewGuid());
+                _drag = new DragState(h.Row, h.Index, mode, pos.X, TimeAt(pos.X), s, en, "drag" + Guid.NewGuid());
                 return; // seek happens on release if the mouse didn't move
             }
         }
@@ -115,13 +115,14 @@ public partial class EditorWindow
     private void OnTimelineMove(object sender, MouseEventArgs e)
     {
         var pos = e.GetPosition(Timeline);
+        if (_drag is { Moved: true } || _scrubbing) AutoScroll(pos.X);
         if (_drag is { } d)
         {
             if (!d.Moved && Math.Abs(pos.X - d.X0) < 3) return;
             d.Moved = true;
             var (lo, hi) = Bounds(d.Row, d.Index);
             var tol = Keyboard.Modifiers.HasFlag(ModifierKeys.Alt) ? 0 : EdgePx * PxToTime;
-            var (s, en) = TimelineEdit.Drag(d.S0, d.E0, d.Mode, (pos.X - d.X0) * PxToTime, lo, hi, MinLen, SnapPoints(d.Row, d.Index), tol);
+            var (s, en) = TimelineEdit.Drag(d.S0, d.E0, d.Mode, TimeAt(pos.X) - d.T0, lo, hi, MinLen, SnapPoints(d.Row, d.Index), tol);
             Commit(With(d.Row, d.Index, Math.Round(s, 3), Math.Round(en, 3)), d.Key); // one key per drag = one undo step
             if (d.Mode != DragMode.Move) Seek(d.Mode == DragMode.Start ? s : en); // show the frame at the edge being trimmed
             return;
@@ -157,6 +158,24 @@ public partial class EditorWindow
     {
         var f = _view.Follow(Now, _duration);
         if (f != _view) { _view = f; DrawTimeline(); }
+    }
+
+    /// <summary>Scrolls while dragging within 24 px of either edge (or past it, the mouse is captured).</summary>
+    // shortcut: only scrolls on mouse moves, so holding still at the edge stops; add a timer if users ask.
+    private void AutoScroll(double x)
+    {
+        const double Edge = 24;
+        var w = Timeline.ActualWidth;
+        var dir = x < Edge ? -1 : x > w - Edge ? 1 : 0;
+        if (dir == 0) return;
+        var v = _view.ScrollBy(dir * _view.Length * 0.03, _duration);
+        if (v != _view) { _view = v; DrawTimeline(); }
+    }
+
+    private void OnTimelineScroll(object sender, System.Windows.Controls.Primitives.ScrollEventArgs e)
+    {
+        _view = (_view with { Start = e.NewValue }).Clamped(_duration);
+        DrawTimeline();
     }
 
     private void OnZoomInTimeline(object sender, RoutedEventArgs e) => ZoomTimeline(1.5);

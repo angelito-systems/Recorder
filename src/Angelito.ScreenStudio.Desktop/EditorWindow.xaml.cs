@@ -342,6 +342,12 @@ public partial class EditorWindow : Window
         if (_m == null || Timeline.ActualWidth <= 0) return;
         var w = Timeline.ActualWidth;
         _view = _view.Clamped(_duration);
+        TimelineScroll.Visibility = _view.Length < _duration - 0.001 ? Visibility.Visible : Visibility.Collapsed;
+        TimelineScroll.Maximum = Math.Max(0, _duration - _view.Length);
+        TimelineScroll.ViewportSize = _view.Length;
+        TimelineScroll.SmallChange = _view.Length * 0.15;
+        TimelineScroll.LargeChange = _view.Length * 0.9;
+        TimelineScroll.Value = _view.Start;
         double X(double t) => _view.ToX(t, w);
         Timeline.Children.Clear();
 
