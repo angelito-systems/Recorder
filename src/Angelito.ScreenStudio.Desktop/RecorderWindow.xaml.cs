@@ -244,6 +244,8 @@ public partial class RecorderWindow : Window
 
     private void OnAbout(object sender, RoutedEventArgs e) => AboutWindow.ShowFor(this);
 
+    private void OnEditKeys(object sender, RoutedEventArgs e) => KeysWindow.ShowFor(this);
+
     private void OnOpen(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog { Filter = $"Proyecto Angelito Studio|*{StudioProject.Extension}", InitialDirectory = App.RecordingsDir };
