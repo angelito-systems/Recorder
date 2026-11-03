@@ -23,6 +23,17 @@ public sealed record WebcamLayout(bool Visible = true, WebcamShape Shape = Webca
 public sealed record AudioMix(double MicGainDb = 0, double SystemGainDb = 0, bool MicMuted = false, bool SystemMuted = false,
     double MicSync = 0, double SystemSync = 0);
 
+/// <summary>On-screen text, drawn above everything. Times are source seconds (so text follows the content through cuts);
+/// X/Y is the center normalized to the output frame; Size is the font size as a fraction of output height.</summary>
+public sealed record TextItem(double Start, double End, string Text, double X = 0.5, double Y = 0.15, double Size = 0.07,
+    string Color = "#FFFFFF", bool Background = true, bool Bold = true);
+
+/// <summary>One subtitle, in source seconds like everything else; SRT import/export converts to output time.</summary>
+public sealed record Cue(double Start, double End, string Text);
+
+/// <summary>Y is the vertical center normalized to the output frame. Burn draws subtitles into the exported video.</summary>
+public sealed record SubtitleStyle(double Size = 0.045, double Y = 0.9, string Color = "#FFFFFF", bool Background = true, bool Burn = true);
+
 public enum ExportQuality { Fast, Balanced, High }
 
 /// <summary>Height 0 keeps the source size.</summary>
@@ -42,7 +53,9 @@ public sealed record StudioProject
     public WebcamLayout Webcam { get; init; } = new();
     public AudioMix Audio { get; init; } = new();
     public ExportSettings Export { get; init; } = new();
-
+    public List<TextItem> Texts { get; init; } = [];
+    public List<Cue> Subtitles { get; init; } = [];
+    public SubtitleStyle SubtitleStyle { get; init; } = new();
     public static StudioProject FromSession(double duration, IReadOnlyList<CursorEvent> cursor, int width, int height) => new()
     {
         Segments = [new Segment(0, duration)],
@@ -75,6 +88,46 @@ public sealed record StudioProject
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(projectPath))!, SessionDir));
 
     [JsonIgnore] public double OutputDuration => Segments.Sum(s => s.Duration);
+
+    /// <summary>Source time → output time (after cuts), or null if t is in a removed range.</summary>
+    public double? ToOutput(double t)
+    {
+        double acc = 0;
+        foreach (var s in Segments)
+        {
+            if (t >= s.Start && t <= s.End) return acc + t - s.Start;
+            acc += s.Duration;
+        }
+        return null;
+    }
+
+    /// <summary>Output time → source time; clamped to the last kept frame.</summary>
+    public double ToSource(double o)
+    {
+        foreach (var s in Segments)
+        {
+            if (o <= s.Duration) return s.Start + Math.Max(0, o);
+            o -= s.Duration;
+        }
+        return Segments.Count > 0 ? Segments[^1].End : 0;
+    }
+
+    /// <summary>The output-time span of a source range, trimmed to what survives the cuts; null if fully removed.</summary>
+    public (double Start, double End)? OutputRange(double a, double b)
+    {
+        var kept = Segments.Select(s => (S: Math.Max(s.Start, a), E: Math.Min(s.End, b))).Where(r => r.E > r.S).ToList();
+        if (kept.Count == 0) return null;
+        return (ToOutput(kept[0].S)!.Value, ToOutput(kept[^1].E)!.Value);
+    }
+
+    /// <summary>SRT in output time, i.e. aligned with the exported video. Cues inside removed ranges are dropped.</summary>
+    public string ExportSrt() => Srt.Format(Subtitles.OrderBy(c => c.Start)
+        .Select(c => OutputRange(c.Start, c.End) is { } r ? new Cue(r.Start, r.End, c.Text) : null)
+        .Where(c => c != null && c.End - c.Start > 0.01)!);
+
+    /// <summary>Replaces subtitles with an SRT written against the exported video's timing.</summary>
+    public StudioProject ImportSrt(string srt) =>
+        this with { Subtitles = Srt.Parse(srt).Select(c => new Cue(ToSource(c.Start), ToSource(c.End), c.Text)).Where(c => c.End > c.Start).ToList() };
 
     /// <summary>Splits the segment containing t. No-op if t is at an edge or in a removed range.</summary>
     public StudioProject SplitAt(double t)

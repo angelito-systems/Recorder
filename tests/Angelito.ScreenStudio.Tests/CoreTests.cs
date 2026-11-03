@@ -158,7 +158,11 @@ public class ExportIntegrationTests
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "sine=f=440:d=3", Path.Combine(dir, "mic.wav")])).Code);
         var m = new SessionManifest { Width = 640, Height = 360, Fps = 30, Webcam = "webcam.mp4", WebcamOffset = 0.2, Mic = "mic.wav", MicOffset = 0.5, Complete = true };
         var cursor = new List<CursorEvent> { new(1, 320, 180, CursorKind.Left), new(1.3, 330, 190, CursorKind.Right) };
-        var p = StudioProject.FromSession(4, cursor, 640, 360).SplitAt(2).DeleteAt(2.5);
+        var p = StudioProject.FromSession(4, cursor, 640, 360).SplitAt(2).DeleteAt(2.5) with
+        {
+            Texts = [new(0.2, 1.5, "Título 100% \"real\"\r\ncon dos líneas")],
+            Subtitles = [new(0.5, 1.8, "Subtítulo: a\\b")],
+        };
         Assert.NotEmpty(p.Zooms);
 
         var outPath = Path.Combine(dir, "out.mp4");

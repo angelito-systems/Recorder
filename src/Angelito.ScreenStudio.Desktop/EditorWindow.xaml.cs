@@ -163,6 +163,7 @@ public partial class EditorWindow : Window
 
         UndoBtn.IsEnabled = _history.CanUndo;
         RedoBtn.IsEnabled = _history.CanRedo;
+        RefreshText();
         Title = $"{(_dirty ? "• " : "")}{App.Product} — Editor";
         _refreshing = false;
         DrawTimeline();
@@ -230,6 +231,7 @@ public partial class EditorWindow : Window
             Canvas.SetTop(el, active[i].Y - size / 2);
         }
 
+        ApplyText(t);
         TimeText.Text = $"{Fmt(t)} / {Fmt(_duration)}";
         var w = Timeline.ActualWidth;
         _playhead.X1 = _playhead.X2 = t / _duration * w;
@@ -291,7 +293,7 @@ public partial class EditorWindow : Window
 
     // ---------- timeline ----------
 
-    private const double RulerH = 18, SegTop = 26, SegH = 44, ZoomTop = 80, ZoomH = 30, ClickTop = 118;
+    private const double RulerH = 18, SegTop = 26, SegH = 40, ZoomTop = 74, ZoomH = 26, TextTop = 108, CueTop = 132, RowH = 20, ClickTop = 158;
 
     private void OnTimelineResize(object sender, SizeChangedEventArgs e) => DrawTimeline();
 
@@ -344,6 +346,8 @@ public partial class EditorWindow : Window
             Timeline.Children.Add(r);
         }
 
+        DrawTextRows(X);
+
         foreach (var c in _clicks)
             Timeline.Children.Add(new Line { X1 = X(c.T), X2 = X(c.T), Y1 = ClickTop, Y2 = ClickTop + 10, Stroke = Brushes.Goldenrod, StrokeThickness = 1 });
 
@@ -357,9 +361,10 @@ public partial class EditorWindow : Window
         var t = pos.X / Timeline.ActualWidth * _duration;
         if (pos.Y >= ZoomTop && pos.Y <= ZoomTop + ZoomH)
         {
-            _selectedZoom = P.Zooms.FindIndex(z => t >= z.Start && t <= z.End);
-            Refresh();
+            Select(zoom: P.Zooms.FindIndex(z => t >= z.Start && t <= z.End));
         }
+        else if (pos.Y >= TextTop && pos.Y <= TextTop + RowH) Select(text: P.Texts.FindLastIndex(x => t >= x.Start && t <= x.End));
+        else if (pos.Y >= CueTop && pos.Y <= CueTop + RowH) Select(cue: P.Subtitles.FindIndex(x => t >= x.Start && t <= x.End));
         _scrubbing = true;
         Timeline.CaptureMouse();
         Seek(t);
@@ -395,7 +400,7 @@ public partial class EditorWindow : Window
         var nextStart = P.Zooms.Where(z => z.Start > t).Select(z => z.Start).DefaultIfEmpty(end).Min();
         if (P.Zooms.Any(z => t >= z.Start && t < z.End) || Math.Min(end, nextStart) - t < 0.5) return;
         var zooms = P.Zooms.Append(new ZoomSegment(t, Math.Min(end, nextStart), 2, 0.5, 0.5)).OrderBy(z => z.Start).ToList();
-        _selectedZoom = zooms.FindIndex(z => z.Start == t);
+        Select(zoom: zooms.FindIndex(z => z.Start == t), refresh: false);
         Commit(P with { Zooms = zooms }, "add" + Guid.NewGuid());
     }
 

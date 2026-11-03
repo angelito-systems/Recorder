@@ -23,7 +23,8 @@ public static class Layout
     public static int Even(double v) => Math.Max(2, (int)Math.Round(v / 2) * 2);
 }
 
-public sealed record ExportPlan(List<string> Args, string FilterGraph, double Duration);
+/// <summary>Files maps auxiliary file paths (text overlays) to their contents; they are written next to the graph before running.</summary>
+public sealed record ExportPlan(List<string> Args, string FilterGraph, double Duration, Dictionary<string, string> Files);
 
 /// <summary>Turns a project into one ffmpeg invocation (single process, whole graph), mirroring the preview's layer order:
 /// screen → click rings → zoom → webcam → cuts → encode.</summary>
@@ -81,6 +82,29 @@ public static class Exporter
             input++;
         }
 
+        // Texts and burned subtitles: screen-space, above the webcam, on source time like the rest.
+        var files = new Dictionary<string, string>();
+        var dir = Path.GetDirectoryName(Path.GetFullPath(graphPath))!;
+        var n = 0;
+        void Text(double start, double end, string text, double cx, double cy, double size, string color, bool box, bool bold)
+        {
+            text = text.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
+            if (text.Length == 0 || end <= start) return;
+            // textfile + expansion=none: no escaping of user text inside the filtergraph.
+            var file = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(graphPath)}.text{n}.txt");
+            // shortcut: FFmpeg 8 drawtext draws a missing-glyph box for LF but breaks cleanly on CR; re-check when upgrading FFmpeg.
+            files[file] = text.Replace('\n', '\r');
+            var px = Math.Max(8, (int)Math.Round(size * oh));
+            var (r, gg, b) = ParseColor(color);
+            g.Append(F($"[{last}]drawtext=fontfile='{FilterPath(Font(bold))}':textfile='{FilterPath(file)}':expansion=none:text_align=C:fontsize={px}:fontcolor=0x{r:X2}{gg:X2}{b:X2}"));
+            if (box) g.Append(F($":box=1:boxcolor=black@0.55:boxborderw={TextPad(px)}"));
+            g.Append(F($":x=({cx}*w-text_w/2):y=({cy}*h-text_h/2):enable='between(t,{start:F3},{end:F3})'[x{n}];\n"));
+            last = $"x{n++}";
+        }
+        foreach (var t in p.Texts) Text(t.Start, t.End, t.Text, t.X, t.Y, t.Size, t.Color, t.Background, t.Bold);
+        if (p.SubtitleStyle.Burn)
+            foreach (var c in p.Subtitles) Text(c.Start, c.End, c.Text, 0.5, p.SubtitleStyle.Y, p.SubtitleStyle.Size, p.SubtitleStyle.Color, p.SubtitleStyle.Background, false);
+
         // Audio: every source aligned to screen time, mixed, padded so cuts never run short.
         var audio = new List<string>();
         void AddAudio(string? file, double offset, double sync, double gainDb, bool muted, string label)
@@ -119,7 +143,7 @@ public static class Exporter
         args.AddRange(["-/filter_complex", graphPath, "-map", "[vout]", "-map", "[aout]"]);
         args.AddRange(enc.QualityArgs(p.Export.Quality));
         args.AddRange(["-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", outPath]);
-        return new ExportPlan(args, g.ToString(), p.OutputDuration);
+        return new ExportPlan(args, g.ToString(), p.OutputDuration, files);
     }
 
     /// <summary>Shifts a stream that started <paramref name="delay"/> seconds after the screen video.</summary>
@@ -131,6 +155,15 @@ public static class Exporter
         return delay > 0 ? F($"tpad=start_duration={delay:F4}:start_mode=clone,") : F($"trim=start={-delay:F4},setpts=PTS-STARTPTS,");
     }
 
+    /// <summary>Box padding around text, shared with the preview.</summary>
+    public static int TextPad(int fontPx) => Math.Max(2, (int)Math.Round(fontPx * 0.3));
+
+    public static string Font(bool bold) =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), bold ? "segoeuib.ttf" : "segoeui.ttf");
+
+    /// <summary>Path inside a quoted filter option: forward slashes, escaped drive colon and quotes.</summary>
+    private static string FilterPath(string path) => path.Replace('\\', '/').Replace(":", "\\:").Replace("'", "\\'");
+
     public static (int R, int G, int B) ParseColor(string hex)
     {
         var h = hex.TrimStart('#');
@@ -141,7 +174,15 @@ public static class Exporter
     public static async Task RunAsync(ExportPlan plan, string graphPath, Action<double> progress01, CancellationToken ct)
     {
         await File.WriteAllTextAsync(graphPath, plan.FilterGraph, ct);
-        var (code, log) = await FfmpegProcess.RunAsync(plan.Args, s => progress01(Math.Clamp(s / Math.Max(0.01, plan.Duration), 0, 1)), ct);
-        if (code != 0) throw new InvalidOperationException("La exportación falló:\n" + log);
+        foreach (var (path, text) in plan.Files) await File.WriteAllTextAsync(path, text, ct);
+        try
+        {
+            var (code, log) = await FfmpegProcess.RunAsync(plan.Args, s => progress01(Math.Clamp(s / Math.Max(0.01, plan.Duration), 0, 1)), ct);
+            if (code != 0) throw new InvalidOperationException("La exportación falló:\n" + log);
+        }
+        finally
+        {
+            foreach (var path in plan.Files.Keys) try { File.Delete(path); } catch (IOException) { }
+        }
     }
 }

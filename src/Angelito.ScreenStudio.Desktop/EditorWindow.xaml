@@ -26,7 +26,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="5"/>
-            <RowDefinition Height="190" MinHeight="120"/>
+            <RowDefinition Height="220" MinHeight="160"/>
         </Grid.RowDefinitions>
 
         <!-- Top bar -->
@@ -68,6 +68,7 @@
                             <MediaElement x:Name="CamMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="UniformToFill"
                                           IsMuted="True" RenderTransformOrigin="0.5,0.5"/>
                         </Border>
+                        <Canvas x:Name="TextLayer"/>
                     </Grid>
                 </Viewbox>
             </Border>
@@ -97,6 +98,55 @@
                         </WrapPanel>
                         <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Haz clic en la vista previa para centrar el zoom seleccionado."/>
                     </StackPanel>
+
+                    <TextBlock Style="{StaticResource Section}" Text="Texto"/>
+                    <WrapPanel>
+                        <Button Content="Añadir texto" Click="OnAddText" ToolTip="Texto de 3 s en el cabezal"/>
+                        <Button x:Name="DelTextBtn" Content="Quitar" Click="OnDeleteText" Margin="6,0,0,0"/>
+                    </WrapPanel>
+                    <StackPanel x:Name="TextPanel" Margin="0,8,0,0">
+                        <TextBox x:Name="TextContent" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" TextChanged="OnTextEdit"/>
+                        <TextBlock Text="Tamaño" Margin="0,6,0,0"/>
+                        <Slider x:Name="TextSize" Minimum="0.02" Maximum="0.2" ValueChanged="OnTextEdit"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource Swatch}" Background="#FFFFFF" Tag="#FFFFFF" Click="OnTextColor"/>
+                            <Button Style="{StaticResource Swatch}" Background="#FACC15" Tag="#FACC15" Click="OnTextColor"/>
+                            <Button Style="{StaticResource Swatch}" Background="#8B5CF6" Tag="#8B5CF6" Click="OnTextColor"/>
+                            <Button Style="{StaticResource Swatch}" Background="#22C55E" Tag="#22C55E" Click="OnTextColor"/>
+                            <Button Style="{StaticResource Swatch}" Background="#111111" Tag="#111111" Click="OnTextColor"/>
+                        </StackPanel>
+                        <WrapPanel Margin="0,6,0,0">
+                            <CheckBox x:Name="TextBg" Content="Fondo" Click="OnTextEdit"/>
+                            <CheckBox x:Name="TextBold" Content="Negrita" Click="OnTextEdit" Margin="12,0,0,0"/>
+                        </WrapPanel>
+                        <WrapPanel Margin="0,6,0,0">
+                            <Button Content="Inicio = cabezal" Click="OnTextStartHere"/>
+                            <Button Content="Fin = cabezal" Click="OnTextEndHere" Margin="6,0,0,0"/>
+                        </WrapPanel>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Arrastra el texto en la vista previa para moverlo."/>
+                    </StackPanel>
+
+                    <TextBlock Style="{StaticResource Section}" Text="Subtítulos"/>
+                    <WrapPanel>
+                        <Button Content="Añadir" Click="OnAddCue" ToolTip="Subtítulo en el cabezal"/>
+                        <Button x:Name="DelCueBtn" Content="Quitar" Click="OnDeleteCue" Margin="6,0,0,0"/>
+                        <Button Content="Importar SRT…" Click="OnImportSrt" Margin="6,0,0,0" ToolTip="Tiempos del video exportado"/>
+                        <Button Content="Exportar SRT…" Click="OnExportSrt" Margin="0,6,0,0" ToolTip="Tiempos ajustados a los cortes"/>
+                    </WrapPanel>
+                    <StackPanel x:Name="CuePanel" Margin="0,8,0,0">
+                        <TextBox x:Name="CueContent" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="44" TextChanged="OnCueEdit"/>
+                        <WrapPanel Margin="0,6,0,0">
+                            <Button Content="Inicio = cabezal" Click="OnCueStartHere"/>
+                            <Button Content="Fin = cabezal" Click="OnCueEndHere" Margin="6,0,0,0"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <TextBlock x:Name="CueInfo" Style="{StaticResource Hint}" Margin="0,6,0,0"/>
+                    <TextBlock Text="Tamaño" Margin="0,6,0,0"/>
+                    <Slider x:Name="SubSize" Minimum="0.02" Maximum="0.1" ValueChanged="OnSubStyleEdit"/>
+                    <TextBlock Text="Posición vertical"/>
+                    <Slider x:Name="SubY" Minimum="0.05" Maximum="0.95" ValueChanged="OnSubStyleEdit"/>
+                    <CheckBox x:Name="SubBg" Content="Fondo" Click="OnSubStyleEdit"/>
+                    <CheckBox x:Name="SubBurn" Content="Incrustar en el video exportado" Click="OnSubStyleEdit" Margin="0,4,0,0"/>
 
                     <TextBlock Style="{StaticResource Section}" Text="Cursor"/>
                     <CheckBox x:Name="ShowClicks" Content="Resaltar clics" Click="OnCursorEdit"/>
@@ -178,7 +228,7 @@
                 <Button x:Name="PlayBtn" Content="▶" Width="44" Click="OnPlay" ToolTip="Reproducir / pausar (Espacio)"/>
                 <TextBlock x:Name="TimeText" VerticalAlignment="Center" Margin="12,0" FontFamily="Cascadia Mono, Consolas"/>
                 <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" HorizontalAlignment="Right"
-                           Text="Espacio: reproducir · S: dividir · Supr: eliminar tramo · ←/→: fotograma · Ctrl+Z/Y"/>
+                           Text="Filas: clips · zoom · texto · subtítulos · clics    Espacio: reproducir · S: dividir · Supr: eliminar tramo · ←/→: fotograma · Ctrl+Z/Y"/>
             </DockPanel>
             <Border CornerRadius="6" Background="#14141B" ClipToBounds="True">
                 <Canvas x:Name="Timeline" Background="Transparent" SizeChanged="OnTimelineResize"

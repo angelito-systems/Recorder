@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -16,12 +16,9 @@ public partial class App : Application
         Directory.CreateDirectory(DataDir);
         DispatcherUnhandledException += OnUnhandled;
         base.OnStartup(e);
-        if (e.Args.Length == 1 && File.Exists(e.Args[0]))
-        {
-            ShutdownMode = ShutdownMode.OnLastWindowClose;
-            StartupUri = null;
-            new EditorWindow(e.Args[0]).Show();
-        }
+        // A project path argument (e.g. double-clicking a .angelstudio) opens the editor directly.
+        if (e.Args.Length == 1 && File.Exists(e.Args[0])) new EditorWindow(e.Args[0]).Show();
+        else new RecorderWindow().Show();
     }
 
     /// <summary>Logs the error (no user content) and keeps the app alive; the project is autosaved separately.</summary>
