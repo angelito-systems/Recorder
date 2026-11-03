@@ -43,7 +43,7 @@ internal sealed unsafe class WindowCapture : IDisposable
     public event Action<string>? Lost;
 
     /// <param name="size">Output size; null = the window's current size. Later parts of a recording reuse the first part's size.</param>
-    public WindowCapture(IntPtr hwnd, (int W, int H)? size = null)
+    public WindowCapture(IntPtr hwnd, (int W, int H)? size = null, bool cursor = true)
     {
         (_device, _d3d, _ctx) = CreateDevice();
         _item = CreateItem(hwnd);
@@ -58,7 +58,7 @@ internal sealed unsafe class WindowCapture : IDisposable
         _pool.FrameArrived += OnFrame;
         _item.Closed += (_, _) => Lost?.Invoke("La ventana que se estaba grabando se cerró.");
         _session = _pool.CreateCaptureSession(_item);
-        _session.IsCursorCaptureEnabled = true;
+        _session.IsCursorCaptureEnabled = cursor;
         // Windows 11 can hide the yellow capture border; Windows 10 always shows it.
         if (Windows.Foundation.Metadata.ApiInformation.IsPropertyPresent("Windows.Graphics.Capture.GraphicsCaptureSession", "IsBorderRequired"))
             try { _session.IsBorderRequired = false; } catch (UnauthorizedAccessException) { }

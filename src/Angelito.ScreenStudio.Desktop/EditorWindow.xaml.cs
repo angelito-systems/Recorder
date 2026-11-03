@@ -149,6 +149,8 @@ public partial class EditorWindow : Window
         AzInText.Text = $"Acercamiento: {az.ZoomIn * 1000:0} ms";
         AzOutText.Text = $"Alejamiento: {az.ZoomOut * 1000:0} ms";
 
+        RefreshPointer();
+        RefreshPointerControls();
         ShowClicks.IsChecked = p.Cursor.ShowClicks;
         RingSize.Value = p.Cursor.Size;
         RingDuration.Value = p.Cursor.Duration;
@@ -242,6 +244,7 @@ public partial class EditorWindow : Window
     private void ApplyVisuals(double t)
     {
         if (_m == null) return;
+        ApplyPointer(t);
         var (vx, vy, vw, _) = ZoomMath.ViewRect(P.Zooms, t, _m.Width, _m.Height, P.Canvas);
         var s = SW / vw; // stage = canvas window in source-pixel units
         ZoomTransform.Matrix = new Matrix(s, 0, 0, s, -vx * s, -vy * s);

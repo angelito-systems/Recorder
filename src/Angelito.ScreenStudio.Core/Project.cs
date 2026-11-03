@@ -121,6 +121,7 @@ public sealed record StudioProject
     public List<ZoomSegment> Zooms { get; init; } = [];
     public AutoZoomSettings AutoZoom { get; init; } = new();
     public CursorStyle Cursor { get; init; } = new();
+    public PointerStyle Pointer { get; init; } = new();
     public WebcamLayout Webcam { get; init; } = new();
     public AudioMix Audio { get; init; } = new();
     public ExportSettings Export { get; init; } = new();

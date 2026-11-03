@@ -27,6 +27,14 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+    [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern int GetSystemMetricsForDpi(int index, uint dpi);
+    [DllImport("user32.dll")] private static extern IntPtr MonitorFromPoint(POINT pt, uint flags);
+    [DllImport("shcore.dll")] private static extern int GetDpiForMonitor(IntPtr mon, int type, out uint x, out uint y);
+
+    /// <summary>Effective DPI of the monitor containing a desktop point (96 if unknown).</summary>
+    public static uint MonitorDpi(int x, int y) =>
+        GetDpiForMonitor(MonitorFromPoint(new POINT { X = x, Y = y }, 2 /* NEAREST */), 0, out var dx, out _) == 0 ? dx : 96;
     [DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint vk);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
 }

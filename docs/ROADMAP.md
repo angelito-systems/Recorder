@@ -28,6 +28,7 @@ Estado verificado el 2026-11-03 en i7-13650HX / RTX 4050 Laptop / Intel UHD, Win
 - Textos, subtítulos incrustados y atajos aparecen y desaparecen con un fundido (0,2 s, o la mitad si duran menos de 0,4 s), igual en la vista previa al reproducir y en la exportación.
 - Zoom automático cinematográfico (máquina de estados Idle → ZoomingIn → Focused → Tracking → ZoomingOut): acerca al hacer clic (1,5× en 450 ms, llega justo al clic), mantiene mientras los clics caen dentro de la zona ampliada, se desplaza a un clic fuera de ella sin alejar, y vuelve al 100 % tras 2 s sin clics (alejamiento 600 ms; permanencia mínima 1,2 s). Todo configurable en Zoom automático; los zooms automáticos se regeneran sin tocar los manuales. Antes se fusionaban en un único zoom casi permanente centrado en el promedio de los clics. Los solapes se promedian (nunca se suman), igual en vista previa y exportación.
 - Fondo y márgenes: la grabación como tarjeta con esquinas redondeadas sobre un degradado (6 presets), con margen y radio ajustables; igual en vista previa y exportación. La cámara, textos y atajos siguen sobre todo el fotograma.
+- Cursor editable con su forma real: el video se graba sin cursor y se guarda la apariencia exacta de cada momento (flecha, texto, mano, redimensionar, espera y otros animados con todos sus fotogramas, cursores propios de cada programa) con su punto de clic y su escala de DPI; cada forma se captura una vez (caché por identificador y por contenido). Modos Original, Cinematográfico (suavizado que pasa exacto por cada clic) y Personalizado (imagen propia en lugar de la flecha); tamaño, opacidad, ocultar en reposo. Se dibuja en coordenadas de la grabación, así que sigue a los zooms; vista previa y exportación usan la misma función. Si Windows oculta el cursor (un programa dibuja el suyo) no se dibuja nada encima: sin duplicados. Grabaciones antiguas: el cursor sigue dentro del video, sin cambios. Verificado con grabación real (8 cambios de forma) y pruebas con cursores reales de Windows.
 - Cámara (zoom y encuadre) por GPU con libplacebo/Vulkan cuando FFmpeg lo trae (el incluido sí): un sondeo elige la GPU más rápida y solo la usa si no es más lenta que la CPU (en este equipo, la RTX 4050 sí y la Intel no: 199 frente a 47 fps). Misma velocidad que `perspective` en una GPU dedicada pero con ~6× menos CPU, que queda para el codificador. Si falla al exportar, se repite por CPU. Prueba de paridad por píxeles igual que la CPU.
 - Reordenar clips: botones «◀ Clip» / «Clip ▶» (Ctrl+←/→) mueven el clip bajo el cabezal en el orden del video; el timeline sigue en tiempo de grabación y cada clip muestra su número de orden. Reproducción, exportación, SRT y recortes siguen ese orden; zooms, textos y anotaciones viajan con su contenido.
 - Exportación MP4 AV1: NVENC/QSV/AMF si la GPU lo soporta, si no libaom (CPU, lento). Verificado que el archivo se decodifica entero sin errores con FFmpeg; en Windows el reproductor necesita la extensión AV1 de Microsoft Store, y los navegadores y móviles recientes lo reproducen.
@@ -37,10 +38,9 @@ Estado verificado el 2026-11-03 en i7-13650HX / RTX 4050 Laptop / Intel UHD, Win
 
 1. Ventana: si se redimensiona durante la grabación se recorta/rellena (no se escala). Siguiente paso de rendimiento posible: codificar en proceso con Media Foundation desde la textura (sin copia a CPU ni tubería).
 2. Imágenes/logotipos, numeración de pasos y callouts; animaciones de entrada/salida.
-3. Cursor ampliado/suavizado en posproducción (requiere grabar sin cursor y dibujarlo, `draw_mouse=0` + `sendcmd`; hoy solo se guardan posición y clics, no la forma del cursor).
-4. Seguimiento automático del cursor como propuesta de encuadre.
-5. Certificado de una CA pública (el autofirmado ya existe, ver RELEASE.md) y actualizaciones firmadas.
-6. Multimonitor: el emparejamiento salida DXGI ↔ monitor es por tamaño y orden; **no verificado** con varios monitores (este equipo tiene uno).
+3. Seguimiento automático del cursor como propuesta de encuadre.
+4. Certificado de una CA pública (el autofirmado ya existe, ver RELEASE.md) y actualizaciones firmadas.
+5. Multimonitor: el emparejamiento salida DXGI ↔ monitor es por tamaño y orden; **no verificado** con varios monitores (este equipo tiene uno).
 
 ## No se hará sin requisitos
 

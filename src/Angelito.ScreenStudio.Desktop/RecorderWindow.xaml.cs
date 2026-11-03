@@ -146,7 +146,7 @@ public partial class RecorderWindow : Window
             var dir = Path.Combine(App.RecordingsDir, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
             _rec = new Recorder(new RecordOptions(mon, _region, int.Parse((string)((ComboBoxItem)FpsBox.SelectedItem).Tag), cam == NoCam ? null : cam,
                 MicBox.IsChecked == true, SysBox.IsChecked == true, await ScreenEncoder(mon), await _cpuEnc!, dir, KeyFilterOrNull(), WindowBox.SelectedItem as WindowInfo,
-                (MicDevBox.SelectedItem as AudioDevice)?.Id, (SpkDevBox.SelectedItem as AudioDevice)?.Id));
+                (MicDevBox.SelectedItem as AudioDevice)?.Id, (SpkDevBox.SelectedItem as AudioDevice)?.Id, EditableCursorBox.IsChecked == true));
             _rec.Warning += msg => Dispatcher.BeginInvoke(() => { App.Log(msg); Status.Text = msg; });
             _rec.Start();
             SetRecording(true);
@@ -190,7 +190,7 @@ public partial class RecorderWindow : Window
         if (on) _pulse.Begin(this, true); else { _pulse.Stop(this); Pulse.Opacity = 0; }
         Timer.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         MonitorBox.IsEnabled = CamBox.IsEnabled = FpsBox.IsEnabled = MicBox.IsEnabled = SysBox.IsEnabled = KeysBox.IsEnabled = WindowBox.IsEnabled = RegionBtn.IsEnabled = FullBtn.IsEnabled = OpenBtn.IsEnabled
-            = MicDevBox.IsEnabled = SpkDevBox.IsEnabled = !on;
+            = MicDevBox.IsEnabled = SpkDevBox.IsEnabled = EditableCursorBox.IsEnabled = !on;
         PauseBtn.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         PauseBtn.IsEnabled = true;
         PauseBtn.Content = "❚❚ Pausar";
