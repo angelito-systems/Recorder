@@ -1,0 +1,33 @@
+<Window x:Class="Angelito.ScreenStudio.Desktop.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Acerca de Angelito Screen Studio Pro" Width="560" Height="640" MinWidth="460" MinHeight="480"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="20">
+        <DockPanel DockPanel.Dock="Top">
+            <Image Source="Assets/app-256.png" Width="64" Height="64" DockPanel.Dock="Left" Margin="0,0,16,0" RenderOptions.BitmapScalingMode="HighQuality"/>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="Angelito Screen Studio Pro" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock x:Name="VersionText" Style="{StaticResource Hint}" Margin="0,2,0,0"/>
+                <TextBlock Margin="0,6,0,0">
+                    <Run Text="© Angelito Systems S.A.C. · "/>
+                    <Hyperlink NavigateUri="https://angelitosystems.net" RequestNavigate="OnLink">angelitosystems.net</Hyperlink>
+                    <Run Text=" · "/>
+                    <Hyperlink NavigateUri="mailto:angel.calderon@angelitosystems.net" RequestNavigate="OnLink">soporte</Hyperlink>
+                </TextBlock>
+            </StackPanel>
+        </DockPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Abrir carpeta de registros" Click="OnOpenLogs"/>
+            <Button Content="Copiar diagnóstico" Click="OnCopy" Margin="8,0,0,0" Style="{StaticResource AccentButton}"/>
+        </StackPanel>
+
+        <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource Hint}" Margin="0,12,0,0"
+                   Text="Componentes de terceros: FFmpeg (proceso separado; licencia LGPL o GPL según la compilación instalada) y NAudio (MIT). El diagnóstico no incluye contenido de tus grabaciones ni datos personales."/>
+
+        <TextBlock DockPanel.Dock="Top" Style="{StaticResource Section}" Text="Diagnóstico"/>
+        <TextBox x:Name="Diag" IsReadOnly="True" TextWrapping="NoWrap" FontFamily="Cascadia Mono, Consolas" FontSize="12"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+    </DockPanel>
+</Window>

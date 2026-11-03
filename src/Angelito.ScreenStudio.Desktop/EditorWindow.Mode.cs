@@ -52,6 +52,8 @@ public partial class EditorWindow
         SimpleNote.Text = $"Este proyecto incluye {string.Join(", ", hidden)}. Se conservan y se exportan; cambia a modo avanzado para editarlos.";
     }
 
+    private void OnAbout(object sender, RoutedEventArgs e) => AboutWindow.ShowFor(this);
+
     private void OnModeChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_refreshing || ModeBox.SelectedIndex < 0) return;

@@ -45,6 +45,7 @@
                 </ComboBox>
             </StackPanel>
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                <Button Content="Acerca de" Click="OnAbout" Margin="0,0,8,0" ToolTip="Versión y diagnóstico"/>
                 <Button Content="Cola" Click="OnShowQueue" ToolTip="Ver exportaciones"/>
                 <Button x:Name="ExportBtn" Content="Exportar…" Style="{StaticResource AccentButton}" Click="OnExport" Margin="8,0,0,0"/>
             </StackPanel>

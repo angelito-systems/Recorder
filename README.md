@@ -16,4 +16,12 @@ dotnet run --project src/Angelito.ScreenStudio.Desktop
 
 Grabar → Detener abre el editor con la grabación. Las grabaciones se guardan en `Videos\Angelito Studio`.
 
+## Instalador
+
+```
+pwsh build/build-installer.ps1
+```
+
+Genera `artifacts/AngelitoScreenStudio-<versión>-x64.msi` (por usuario, sin administrador). Detalles, firma y FFmpeg: [docs/RELEASE.md](docs/RELEASE.md).
+
 Documentación: [arquitectura](docs/ARCHITECTURE.md) · [formatos](docs/FORMATS.md) · [hoja de ruta](docs/ROADMAP.md)

@@ -1,0 +1,62 @@
+<!--
+  Per-user MSI for Angelito Screen Studio Pro (WiX 5). Built by build/build-installer.ps1.
+  UpgradeCode must never change: it is how a newer MSI finds and replaces an installed older version.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Angelito Screen Studio Pro" Manufacturer="Angelito Systems S.A.C." Version="$(Version)"
+           UpgradeCode="7bd7977e-6c00-4cb9-b0fe-1e2d2076f756" Scope="perUser" Codepage="1252" Language="3082">
+    <SummaryInformation Description="Grabador y editor de pantalla" Manufacturer="Angelito Systems S.A.C." />
+    <MajorUpgrade DowngradeErrorMessage="Ya está instalada una versión más reciente de Angelito Screen Studio Pro." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon" SourceFile="$(AppIcon)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://angelitosystems.net" />
+    <Property Id="ARPHELPLINK" Value="mailto:angel.calderon@angelitosystems.net" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsDir" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Angelito Screen Studio Pro">
+          <?if $(IncludeFfmpeg) = 1 ?>
+          <Directory Id="FfmpegDir" Name="ffmpeg" />
+          <?endif?>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Angelito Screen Studio Pro">
+      <!-- Per-user components key on HKCU values (Windows Installer rule for files in the user profile). -->
+      <Component Id="App" Directory="INSTALLFOLDER" Guid="5a4d1f63-2c3b-4e9e-9b2f-0d9e0f6b8a11">
+        <File Id="AppExe" Source="$(PublishDir)\AngelitoScreenStudio.exe">
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Angelito Screen Studio Pro"
+                    Description="Grabar y editar videos de pantalla" WorkingDirectory="INSTALLFOLDER" Advertise="no" />
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="Angelito Screen Studio Pro"
+                    WorkingDirectory="INSTALLFOLDER" Advertise="no" />
+        </File>
+        <RegistryValue Root="HKCU" Key="Software\Angelito Systems\Angelito Screen Studio Pro" Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\Angelito Systems\Angelito Screen Studio Pro" Name="Version" Type="string" Value="$(Version)" />
+        <!-- Double-clicking a project opens it in the editor. -->
+        <ProgId Id="AngelitoStudio.Project" Description="Proyecto de Angelito Screen Studio" Icon="AppExe" IconIndex="0" Advertise="no">
+          <Extension Id="angelstudio" ContentType="application/x-angelstudio">
+            <Verb Id="open" Command="Abrir" TargetFile="AppExe" Argument="&quot;%1&quot;" />
+          </Extension>
+        </ProgId>
+        <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+      </Component>
+      <?if $(IncludeFfmpeg) = 1 ?>
+      <ComponentGroupRef Id="Ffmpeg" />
+      <?endif?>
+    </Feature>
+
+    <?if $(IncludeFfmpeg) = 1 ?>
+    <ComponentGroup Id="Ffmpeg" Directory="FfmpegDir">
+      <Files Include="$(PublishDir)\ffmpeg\**" />
+      <Component Id="FfmpegFolder" Guid="b1e7c2d4-8f3a-4c6e-a5d9-2e4f6a8c0b13">
+        <RegistryValue Root="HKCU" Key="Software\Angelito Systems\Angelito Screen Studio Pro" Name="BundledFfmpeg" Type="integer" Value="1" KeyPath="yes" />
+        <RemoveFolder Id="RemoveFfmpegFolder" On="uninstall" />
+      </Component>
+    </ComponentGroup>
+    <?endif?>
+  </Package>
+</Wix>
