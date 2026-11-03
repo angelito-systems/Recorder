@@ -38,6 +38,10 @@
                 <Button x:Name="RedoBtn" Content="↷" Click="OnRedo" Margin="6,0,0,0" ToolTip="Rehacer (Ctrl+Y)" Width="38"/>
                 <Button Content="Dividir" Click="OnSplit" Margin="16,0,0,0" ToolTip="Dividir en el cabezal (S)"/>
                 <Button Content="Eliminar tramo" Click="OnDeleteSegment" Margin="6,0,0,0" ToolTip="Eliminar el tramo bajo el cabezal (Supr)"/>
+                <ComboBox x:Name="ModeBox" Margin="16,0,0,0" Width="130" SelectionChanged="OnModeChanged" ToolTip="Simple: grabar, recortar, zoom y exportar. Avanzado: todas las herramientas. Cambiar de modo no modifica el proyecto.">
+                    <ComboBoxItem Content="Modo simple"/>
+                    <ComboBoxItem Content="Modo avanzado"/>
+                </ComboBox>
             </StackPanel>
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                 <Button Content="Cola" Click="OnShowQueue" ToolTip="Ver exportaciones"/>
@@ -82,6 +86,7 @@
             <!-- Inspector -->
             <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Padding="4,0,16,12">
                 <StackPanel>
+                    <TextBlock x:Name="SimpleNote" Style="{StaticResource Hint}" Margin="0,0,0,8" Visibility="Collapsed"/>
                     <TextBlock Style="{StaticResource Section}" Text="Zoom" Margin="0,0,0,6"/>
                     <WrapPanel>
                         <Button Content="Auto-zoom" Click="OnAutoZoom" ToolTip="Regenera propuestas a partir de los clics (reemplaza los zooms actuales)"/>
@@ -101,6 +106,7 @@
                         <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Haz clic en la vista previa para centrar el zoom seleccionado."/>
                     </StackPanel>
 
+                    <StackPanel x:Name="AdvancedTools">
                     <TextBlock Style="{StaticResource Section}" Text="Texto"/>
                     <WrapPanel>
                         <Button Content="Añadir texto" Click="OnAddText" ToolTip="Texto de 3 s en el cabezal"/>
@@ -209,6 +215,7 @@
                         <Button Style="{StaticResource Swatch}" Background="#FFFFFF" Tag="#FFFFFF" Click="OnSwatch"/>
                     </StackPanel>
 
+                    </StackPanel>
                     <StackPanel x:Name="CamSection">
                         <TextBlock Style="{StaticResource Section}" Text="Cámara"/>
                         <CheckBox x:Name="CamVisible" Content="Mostrar cámara" Click="OnCamEdit"/>
@@ -249,6 +256,7 @@
                         <Slider x:Name="SysSync" Minimum="-1" Maximum="1" ValueChanged="OnAudioEdit" ToolTip="Sincronización manual (s)"/>
                     </StackPanel>
 
+                    <StackPanel x:Name="FormatSection">
                     <TextBlock Style="{StaticResource Section}" Text="Formato"/>
                     <ComboBox x:Name="FormatBox" SelectionChanged="OnFormatEdit">
                         <ComboBoxItem Content="Original"/>
@@ -260,6 +268,7 @@
                     <TextBlock x:Name="FramingHint" Style="{StaticResource Hint}" Margin="0,6,0,0"
                                Text="Arrastra el video en la vista previa para encuadrar. Los zooms (también de 1.0×) mueven el encuadre en el tiempo."/>
 
+                    </StackPanel>
                     <TextBlock Style="{StaticResource Section}" Text="Exportación"/>
                     <ComboBox x:Name="PresetBox" SelectionChanged="OnPreset" ToolTip="Rellena los ajustes de abajo; puedes cambiarlos después">
                         <ComboBoxItem Content="Preset…" IsEnabled="False"/>
@@ -311,8 +320,7 @@
                 <Button Content="−" Width="32" Click="OnZoomOutTimeline" ToolTip="Alejar línea de tiempo (Ctrl+−, Ctrl+rueda)"/>
                 <Button Content="+" Width="32" Click="OnZoomInTimeline" Margin="4,0,0,0" ToolTip="Acercar línea de tiempo (Ctrl++, Ctrl+rueda)"/>
                 <Button Content="Ajustar" Click="OnFitTimeline" Margin="4,0,12,0" ToolTip="Ver toda la grabación (Ctrl+0)"/>
-                <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" HorizontalAlignment="Right"
-                           Text="Filas: clips · zoom · texto · subtítulos · anotaciones · audio · clics    Rueda: desplazar · Espacio: reproducir · S: dividir · Supr: eliminar tramo · ←/→: fotograma · Ctrl+Z/Y"/>
+                <TextBlock x:Name="RowsHint" Style="{StaticResource Hint}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
             </DockPanel>
             <Border CornerRadius="6" Background="#14141B" ClipToBounds="True">
                 <Canvas x:Name="Timeline" Background="Transparent" SizeChanged="OnTimelineResize"

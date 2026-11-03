@@ -178,6 +178,7 @@ public partial class EditorWindow : Window
         RefreshText();
         RefreshAnnotations();
         RefreshKeys();
+        ApplyMode();
         Title = $"{(_dirty ? "• " : "")}{App.Product} — Editor";
         _refreshing = false;
         DrawTimeline();
@@ -390,10 +391,8 @@ public partial class EditorWindow : Window
             Timeline.Children.Add(r);
         }
 
-        DrawTextRows();
-        DrawAnnotationRow();
+        if (_advanced) { DrawTextRows(); DrawAnnotationRow(); DrawKeyMarkers(X); }
         DrawAudioRow();
-        DrawKeyMarkers(X);
 
         foreach (var c in _clicks)
             if (c.T >= _view.Start && c.T <= _view.End)

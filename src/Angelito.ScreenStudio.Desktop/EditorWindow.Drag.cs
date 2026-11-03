@@ -49,7 +49,9 @@ public partial class EditorWindow
         return (i > 0 ? items[i - 1].E : 0, i < items.Count - 1 ? items[i + 1].S : _duration);
     }
 
-    private static Row? RowAt(double y) =>
+    private Row? RowAt(double y) => !_advanced && y >= TextTop && y <= AnnTop + RowH ? null : RowAtAll(y); // hidden rows aren't editable in simple mode
+
+    private static Row? RowAtAll(double y) =>
         y >= SegTop && y <= SegTop + SegH ? Row.Segment :
         y >= ZoomTop && y <= ZoomTop + ZoomH ? Row.Zoom :
         y >= TextTop && y <= TextTop + RowH ? Row.Text :
