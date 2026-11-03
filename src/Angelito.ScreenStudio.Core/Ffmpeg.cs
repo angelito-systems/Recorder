@@ -231,7 +231,7 @@ public static class EncoderProbe
 /// A Windows job object with kill-on-close: every ffmpeg we start is assigned to it, so if this app crashes or is killed,
 /// the OS ends the children too instead of leaving a capture running forever. Partial MKVs stay recoverable.
 /// </summary>
-internal static class ChildProcessJob
+public static class ChildProcessJob
 {
     private static readonly IntPtr Job = Create();
 

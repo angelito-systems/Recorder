@@ -18,6 +18,11 @@ public partial class RecorderWindow : Window
     private Task<EncoderChoice>? _cpuEnc;
     private Region? _region;
     private const string WholeScreen = "Pantalla completa o región";
+    private CameraPreview? _camPreview;
+    private NAudio.CoreAudioApi.WasapiCapture? _micProbe; // open only to light the mic meter before recording
+    private NAudio.CoreAudioApi.MMDevice? _spkProbe;
+    private float _micProbePeak;
+    private System.Windows.Media.Animation.Storyboard? _pulse;
 
     public RecorderWindow()
     {
@@ -27,7 +32,9 @@ public partial class RecorderWindow : Window
         SourceInitialized += (_, _) =>
         {
             var hwnd = new WindowInteropHelper(this).Handle;
-            Native.SetWindowDisplayAffinity(hwnd, Native.WDA_EXCLUDEFROMCAPTURE);
+            // ANGELITO_SHOW_IN_CAPTURE=1 keeps it visible to screenshots (docs, support); recordings would then include it.
+            if (Environment.GetEnvironmentVariable("ANGELITO_SHOW_IN_CAPTURE") != "1")
+                Native.SetWindowDisplayAffinity(hwnd, Native.WDA_EXCLUDEFROMCAPTURE);
             // Global hotkeys (Ctrl+Shift+F9 pause/resume, Ctrl+Shift+F10 record/stop); freed by Windows when the window is destroyed.
             const uint CtrlShiftNoRepeat = 0x0002 | 0x0004 | 0x4000;
             if (!Native.RegisterHotKey(hwnd, 1, CtrlShiftNoRepeat, 0x78) | !Native.RegisterHotKey(hwnd, 2, CtrlShiftNoRepeat, 0x79))
@@ -51,6 +58,9 @@ public partial class RecorderWindow : Window
             var monitors = Devices.MonitorsAsync();
             var cams = Devices.WebcamsAsync();
             _cpuEnc = EncoderProbe.ForExportAsync();
+            MicDevBox.ItemsSource = Devices.Audio(capture: true);
+            SpkDevBox.ItemsSource = Devices.Audio(capture: false);
+            MicDevBox.SelectedIndex = SpkDevBox.SelectedIndex = 0;
             MonitorBox.ItemsSource = await monitors;
             MonitorBox.SelectedIndex = 0;
             MonitorBox.SelectionChanged += (_, _) => OnFullScreen(this, new RoutedEventArgs());
@@ -58,6 +68,8 @@ public partial class RecorderWindow : Window
             CamBox.ItemsSource = new[] { NoCam }.Concat(await cams).ToList();
             CamBox.SelectedIndex = 0;
             if (MonitorBox.Items.Count == 0) { Status.Text = "No se encontró ninguna pantalla que se pueda capturar."; return; }
+            OnFullScreen(this, new RoutedEventArgs());
+            _tick.Start(); // meters run before recording too, so levels can be checked first
             var enc = await ScreenEncoder((MonitorInfo)MonitorBox.SelectedItem);
             Status.Text = $"Codificador: {enc.Name}{(enc.Hardware ? " (GPU)" : " (CPU)")} · guardado en {App.RecordingsDir}";
             RecordBtn.IsEnabled = true;
@@ -121,13 +133,20 @@ public partial class RecorderWindow : Window
     private async void OnRecord(object sender, RoutedEventArgs e)
     {
         if (_rec != null) { await StopAsync(); return; }
+        if (MonitorBox.SelectedItem is not MonitorInfo countdownOn) return;
+        RecordBtn.IsEnabled = false;
+        var go = await CountdownWindow.RunAsync(countdownOn);
+        RecordBtn.IsEnabled = true;
+        if (!go) return;
+        await StopPreviewsAsync(); // a dshow camera serves one reader at a time
         try
         {
             var mon = (MonitorInfo)MonitorBox.SelectedItem;
             var cam = CamBox.SelectedItem as string;
             var dir = Path.Combine(App.RecordingsDir, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
             _rec = new Recorder(new RecordOptions(mon, _region, int.Parse((string)((ComboBoxItem)FpsBox.SelectedItem).Tag), cam == NoCam ? null : cam,
-                MicBox.IsChecked == true, SysBox.IsChecked == true, await ScreenEncoder(mon), await _cpuEnc!, dir, KeyFilterOrNull(), WindowBox.SelectedItem as WindowInfo));
+                MicBox.IsChecked == true, SysBox.IsChecked == true, await ScreenEncoder(mon), await _cpuEnc!, dir, KeyFilterOrNull(), WindowBox.SelectedItem as WindowInfo,
+                (MicDevBox.SelectedItem as AudioDevice)?.Id, (SpkDevBox.SelectedItem as AudioDevice)?.Id));
             _rec.Warning += msg => Dispatcher.BeginInvoke(() => { App.Log(msg); Status.Text = msg; });
             _rec.Start();
             SetRecording(true);
@@ -138,6 +157,7 @@ public partial class RecorderWindow : Window
             if (_rec != null) { try { await _rec.StopAsync(); } catch (Exception inner) { App.Log(inner.ToString()); } }
             _rec = null;
             SetRecording(false);
+            StartPreviews();
             MessageBox.Show(this, "No se pudo iniciar la grabación.\n\n" + ex.Message, App.Product, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -159,24 +179,35 @@ public partial class RecorderWindow : Window
         }
         _rec = null;
         SetRecording(false);
+        StartPreviews();
     }
 
     private void SetRecording(bool on)
     {
         RecordBtn.IsEnabled = true;
-        RecordBtn.Content = on ? "■ Detener" : "● Grabar";
+        RecordBtn.Content = on ? "Detener" : "Grabar";
+        _pulse ??= PulseStoryboard();
+        if (on) _pulse.Begin(this, true); else { _pulse.Stop(this); Pulse.Opacity = 0; }
         Timer.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        MonitorBox.IsEnabled = CamBox.IsEnabled = FpsBox.IsEnabled = MicBox.IsEnabled = SysBox.IsEnabled = KeysBox.IsEnabled = WindowBox.IsEnabled = RegionBtn.IsEnabled = FullBtn.IsEnabled = OpenBtn.IsEnabled = !on;
+        MonitorBox.IsEnabled = CamBox.IsEnabled = FpsBox.IsEnabled = MicBox.IsEnabled = SysBox.IsEnabled = KeysBox.IsEnabled = WindowBox.IsEnabled = RegionBtn.IsEnabled = FullBtn.IsEnabled = OpenBtn.IsEnabled
+            = MicDevBox.IsEnabled = SpkDevBox.IsEnabled = !on;
         PauseBtn.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         PauseBtn.IsEnabled = true;
         PauseBtn.Content = "❚❚ Pausar";
         if (!on) OnWindowPick(this, null!); // a chosen window keeps the monitor/region controls disabled
-        if (on) _tick.Start(); else { _tick.Stop(); MicMeter.Value = SysMeter.Value = 0; }
+        if (!on) MicMeter.Value = SysMeter.Value = 0;
     }
 
     private void UpdateMeters()
     {
-        if (_rec == null) return;
+        if (_rec == null)
+        {
+            MicMeter.Value = MicBox.IsChecked == true ? _micProbePeak : 0;
+            try { SysMeter.Value = SysBox.IsChecked == true ? _spkProbe?.AudioMeterInformation.MasterPeakValue ?? 0 : 0; }
+            catch (System.Runtime.InteropServices.COMException) { SysMeter.Value = 0; } // device unplugged
+            _micProbePeak *= 0.85f; // decay between buffers
+            return;
+        }
         Timer.Text = TimeSpan.FromSeconds(_rec.Recorded).ToString(@"hh\:mm\:ss") + (_rec.IsPaused ? "  en pausa" : "") + (_rec.KeysSuspended ? "  · atajos suspendidos" : "");
         MicMeter.Value = _rec.MicPeak;
         SysMeter.Value = _rec.SystemPeak;
@@ -238,11 +269,101 @@ public partial class RecorderWindow : Window
     private void OnFullScreen(object sender, RoutedEventArgs e)
     {
         _region = null;
-        AreaText.Text = "Pantalla completa";
+        AreaText.Text = MonitorBox.SelectedItem is MonitorInfo m ? $"Pantalla completa · {m.Width}×{m.Height}" : "Pantalla completa";
         FullBtn.Visibility = Visibility.Collapsed;
     }
 
     private void OnAbout(object sender, RoutedEventArgs e) => AboutWindow.ShowFor(this);
+
+    private System.Windows.Media.Animation.Storyboard PulseStoryboard()
+    {
+        var sb = new System.Windows.Media.Animation.Storyboard { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever };
+        var dur = TimeSpan.FromSeconds(1.4);
+        void Add(System.Windows.Media.Animation.DoubleAnimation a, string path)
+        {
+            System.Windows.Media.Animation.Storyboard.SetTarget(a, Pulse);
+            System.Windows.Media.Animation.Storyboard.SetTargetProperty(a, new PropertyPath(path));
+            sb.Children.Add(a);
+        }
+        Add(new(0.8, 0, dur), "Opacity");
+        Add(new(1, 1.35, dur), "RenderTransform.ScaleX");
+        Add(new(1, 1.35, dur), "RenderTransform.ScaleY");
+        return sb;
+    }
+
+    private void OnCameraPick(object sender, SelectionChangedEventArgs e)
+    {
+        if (_rec == null && IsLoaded) _ = RestartCameraAsync();
+    }
+
+    private void OnAudioPick(object sender, SelectionChangedEventArgs e)
+    {
+        if (_rec != null || MicDevBox.SelectedItem == null || SpkDevBox.SelectedItem == null) return;
+        StopAudioProbes();
+        StartAudioProbes();
+    }
+
+    private async Task RestartCameraAsync()
+    {
+        if (_camPreview is { } old) { _camPreview = null; await old.StopAsync(); old.Dispose(); }
+        CamImage.Source = null;
+        CamOff.Visibility = Visibility.Visible;
+        if (CamBox.SelectedItem is not string cam || cam == NoCam) return;
+        try
+        {
+            _camPreview = new CameraPreview(cam);
+            CamImage.Source = _camPreview.Bitmap;
+            CamOff.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or FileNotFoundException) { App.Log("camera preview: " + ex.Message); }
+    }
+
+    private void StartAudioProbes()
+    {
+        try
+        {
+            var mic = MicDevBox.SelectedItem as AudioDevice;
+            _micProbe = mic?.Id is { } id ? new NAudio.CoreAudioApi.WasapiCapture(Devices.Endpoint(id)) : new NAudio.CoreAudioApi.WasapiCapture();
+            _micProbe.DataAvailable += (_, a) => { var p = Peak(a.Buffer, a.BytesRecorded, _micProbe?.WaveFormat); if (p > _micProbePeak) _micProbePeak = p; };
+            _micProbe.StartRecording();
+        }
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException) { _micProbe = null; App.Log("mic meter: " + ex.Message); }
+        try
+        {
+            var spk = SpkDevBox.SelectedItem as AudioDevice;
+            if (spk?.Id is { } sid) _spkProbe = Devices.Endpoint(sid);
+            else { using var en = new NAudio.CoreAudioApi.MMDeviceEnumerator(); _spkProbe = en.GetDefaultAudioEndpoint(NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.Role.Multimedia); }
+        }
+        catch (System.Runtime.InteropServices.COMException ex) { _spkProbe = null; App.Log("speaker meter: " + ex.Message); }
+    }
+
+    /// <summary>Peak of a WASAPI buffer (32-bit float or 16-bit PCM), 0..1.</summary>
+    private static float Peak(byte[] buf, int n, NAudio.Wave.WaveFormat? f)
+    {
+        float max = 0;
+        if (f?.Encoding == NAudio.Wave.WaveFormatEncoding.IeeeFloat || f?.BitsPerSample == 32)
+            for (var i = 0; i + 4 <= n; i += 4) max = Math.Max(max, Math.Abs(BitConverter.ToSingle(buf, i)));
+        else
+            for (var i = 0; i + 2 <= n; i += 2) max = Math.Max(max, Math.Abs(BitConverter.ToInt16(buf, i) / 32768f));
+        return Math.Min(1, max);
+    }
+
+    private void StopAudioProbes()
+    {
+        try { _micProbe?.StopRecording(); } catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException) { }
+        _micProbe?.Dispose(); _micProbe = null; _micProbePeak = 0;
+        _spkProbe?.Dispose(); _spkProbe = null;
+    }
+
+    private void StartPreviews() { StartAudioProbes(); _ = RestartCameraAsync(); }
+
+    private async Task StopPreviewsAsync()
+    {
+        StopAudioProbes();
+        if (_camPreview is { } c) { _camPreview = null; await c.StopAsync(); c.Dispose(); }
+        CamImage.Source = null;
+        CamOff.Visibility = Visibility.Visible;
+    }
 
     private void OnEditKeys(object sender, RoutedEventArgs e) => KeysWindow.ShowFor(this);
 
@@ -250,6 +371,13 @@ public partial class RecorderWindow : Window
     {
         var dlg = new OpenFileDialog { Filter = $"Proyecto Angelito Studio|*{StudioProject.Extension}", InitialDirectory = App.RecordingsDir };
         if (dlg.ShowDialog(this) == true) new EditorWindow(dlg.FileName).Show();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        StopAudioProbes();
+        _camPreview?.Dispose();
+        base.OnClosed(e);
     }
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)

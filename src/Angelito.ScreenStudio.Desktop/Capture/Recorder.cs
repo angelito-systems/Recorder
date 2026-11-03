@@ -10,7 +10,8 @@ namespace Angelito.ScreenStudio.Desktop.Capture;
 public sealed record Region(int X, int Y, int Width, int Height);
 
 public sealed record RecordOptions(MonitorInfo Monitor, Region? Region, int Fps, string? Webcam, bool Mic, bool SystemAudio,
-    EncoderChoice ScreenEncoder, EncoderChoice CpuEncoder, string Dir, KeyFilter? Keys = null, WindowInfo? Window = null);
+    EncoderChoice ScreenEncoder, EncoderChoice CpuEncoder, string Dir, KeyFilter? Keys = null, WindowInfo? Window = null,
+    string? MicId = null, string? SpeakerId = null); // audio endpoint ids; null = Windows default
 
 /// <summary>
 /// One recording = one folder of independent streams (see docs/FORMATS.md). Every stream stamps its start against
@@ -92,17 +93,18 @@ public sealed class Recorder
 
         if (_o.Mic)
         {
-            _mic = new WasapiCapture();
+            _mic = _o.MicId is { } mid ? new WasapiCapture(Devices.Endpoint(mid)) : new WasapiCapture();
             _micW = new WaveFileWriter(Path.Combine(_o.Dir, "mic.raw.wav"), _mic.WaveFormat);
             Hook(_mic, _micW, t => { _j.MicOffset = t; Journal(); }, p => MicPeak = p, "micrófono");
         }
         if (_o.SystemAudio)
         {
             // Loopback delivers nothing while the device is silent; playing silence keeps the stream continuous and in sync.
-            _silence = new WasapiOut();
+            var speaker = _o.SpeakerId is { } sid ? Devices.Endpoint(sid) : null;
+            _silence = speaker != null ? new WasapiOut(speaker, NAudio.CoreAudioApi.AudioClientShareMode.Shared, true, 200) : new WasapiOut();
             _silence.Init(new SilenceProvider(new WaveFormat(48000, 16, 2)));
             _silence.Play();
-            _sys = new WasapiLoopbackCapture();
+            _sys = speaker != null ? new WasapiLoopbackCapture(speaker) : new WasapiLoopbackCapture();
             _sysW = new WaveFileWriter(Path.Combine(_o.Dir, "system.raw.wav"), _sys.WaveFormat);
             Hook(_sys, _sysW, t => { _j.SystemOffset = t; Journal(); }, p => SystemPeak = p, "audio del sistema");
         }
