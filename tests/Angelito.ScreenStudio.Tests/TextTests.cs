@@ -26,6 +26,36 @@ public class SrtTests
     }
 }
 
+public class TimelineEditTests
+{
+    private static readonly double[] None = [];
+
+    [Fact]
+    public void MoveKeepsLengthAndStaysInBounds()
+    {
+        Assert.Equal((3, 5), TimelineEdit.Drag(2, 4, DragMode.Move, 1, 0, 10, 0.2, None, 0));
+        Assert.Equal((8, 10), TimelineEdit.Drag(2, 4, DragMode.Move, 50, 0, 10, 0.2, None, 0));
+        Assert.Equal((1, 3), TimelineEdit.Drag(2, 4, DragMode.Move, -5, 1, 10, 0.2, None, 0));
+    }
+
+    [Fact]
+    public void ResizeRespectsMinLengthAndNeighbors()
+    {
+        Assert.Equal((3.8, 4), TimelineEdit.Drag(2, 4, DragMode.Start, 5, 0, 10, 0.2, None, 0));
+        Assert.Equal((2, 6), TimelineEdit.Drag(2, 4, DragMode.End, 9, 0, 6, 0.2, None, 0));
+    }
+
+    [Fact]
+    public void SnapsEdgesWithinTolerance()
+    {
+        double[] snaps = [5.0];
+        Assert.Equal((5, 7), TimelineEdit.Drag(2, 4, DragMode.Move, 2.95, 0, 10, 0.2, snaps, 0.1)); // start snaps
+        Assert.Equal((3, 5), TimelineEdit.Drag(2, 4, DragMode.Move, 0.93, 0, 10, 0.2, snaps, 0.1)); // end snaps
+        Assert.Equal((2, 5), TimelineEdit.Drag(2, 4, DragMode.End, 0.95, 0, 10, 0.2, snaps, 0.1));
+        Assert.Equal((2, 4.8), TimelineEdit.Drag(2, 4, DragMode.End, 0.8, 0, 10, 0.2, snaps, 0.1)); // out of reach
+    }
+}
+
 public class TimeMappingTests
 {
     // Source 0-10 with 4-6 removed: output is 8 s long.

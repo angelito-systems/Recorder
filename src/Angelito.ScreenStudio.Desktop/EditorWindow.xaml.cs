@@ -64,7 +64,7 @@ public partial class EditorWindow : Window
 
         ScreenMedia.MediaOpened += (_, _) =>
         {
-            if (ScreenMedia.NaturalDuration.HasTimeSpan) _duration = ScreenMedia.NaturalDuration.TimeSpan.TotalSeconds;
+            if (ScreenMedia.NaturalDuration.HasTimeSpan) _duration = Math.Max(ScreenMedia.NaturalDuration.TimeSpan.TotalSeconds, P.Segments.Max(s => s.End));
             Seek(P.Segments[0].Start);
             DrawTimeline();
         };
@@ -109,7 +109,7 @@ public partial class EditorWindow : Window
     private void Commit(StudioProject next, string key)
     {
         if (_refreshing) return;
-        var coalesce = key == _lastEditKey && (DateTime.Now - _lastEditAt).TotalSeconds < 1;
+        var coalesce = key == _lastEditKey && (key.StartsWith("drag") || (DateTime.Now - _lastEditAt).TotalSeconds < 1);
         if (coalesce) _history.Replace(next); else _history.Push(next);
         _lastEditKey = key;
         _lastEditAt = DateTime.Now;
@@ -353,32 +353,6 @@ public partial class EditorWindow : Window
 
         Timeline.Children.Add(_playhead);
         ApplyVisuals(Now);
-    }
-
-    private void OnTimelineDown(object sender, MouseButtonEventArgs e)
-    {
-        var pos = e.GetPosition(Timeline);
-        var t = pos.X / Timeline.ActualWidth * _duration;
-        if (pos.Y >= ZoomTop && pos.Y <= ZoomTop + ZoomH)
-        {
-            Select(zoom: P.Zooms.FindIndex(z => t >= z.Start && t <= z.End));
-        }
-        else if (pos.Y >= TextTop && pos.Y <= TextTop + RowH) Select(text: P.Texts.FindLastIndex(x => t >= x.Start && t <= x.End));
-        else if (pos.Y >= CueTop && pos.Y <= CueTop + RowH) Select(cue: P.Subtitles.FindIndex(x => t >= x.Start && t <= x.End));
-        _scrubbing = true;
-        Timeline.CaptureMouse();
-        Seek(t);
-    }
-
-    private void OnTimelineMove(object sender, MouseEventArgs e)
-    {
-        if (_scrubbing) Seek(e.GetPosition(Timeline).X / Timeline.ActualWidth * _duration);
-    }
-
-    private void OnTimelineUp(object sender, MouseButtonEventArgs e)
-    {
-        _scrubbing = false;
-        Timeline.ReleaseMouseCapture();
     }
 
     // ---------- edits ----------
