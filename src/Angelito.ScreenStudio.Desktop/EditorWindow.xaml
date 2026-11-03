@@ -39,6 +39,8 @@
                 <Button x:Name="RedoBtn" Content="↷" Click="OnRedo" Margin="6,0,0,0" ToolTip="Rehacer (Ctrl+Y)" Width="38"/>
                 <Button Content="Dividir" Click="OnSplit" Margin="16,0,0,0" ToolTip="Dividir en el cabezal (S)"/>
                 <Button Content="Eliminar tramo" Click="OnDeleteSegment" Margin="6,0,0,0" ToolTip="Eliminar el tramo bajo el cabezal (Supr)"/>
+                <Button Content="◀ Clip" Click="OnMoveClipEarlier" Margin="6,0,0,0" ToolTip="Mover el clip bajo el cabezal un puesto antes en el video (Ctrl+←)"/>
+                <Button Content="Clip ▶" Click="OnMoveClipLater" Margin="4,0,0,0" ToolTip="Mover el clip bajo el cabezal un puesto después en el video (Ctrl+→)"/>
                 <ComboBox x:Name="ModeBox" Margin="16,0,0,0" Width="130" SelectionChanged="OnModeChanged" ToolTip="Simple: grabar, recortar, zoom y exportar. Avanzado: todas las herramientas. Cambiar de modo no modifica el proyecto.">
                     <ComboBoxItem Content="Modo simple"/>
                     <ComboBoxItem Content="Modo avanzado"/>

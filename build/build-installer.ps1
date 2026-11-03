@@ -31,6 +31,18 @@ if ($FfmpegDir) {
   if (-not (Test-Path (Join-Path $FfmpegDir "ffmpeg.exe"))) { throw "No hay ffmpeg.exe en $FfmpegDir" }
   New-Item -ItemType Directory -Force "$publish\ffmpeg" | Out-Null
   Copy-Item "$FfmpegDir\ffmpeg.exe", "$FfmpegDir\*.dll" "$publish\ffmpeg" -ErrorAction SilentlyContinue
+  # Shipping FFmpeg means shipping its license and saying where its source is (GPL/LGPL).
+  $license = @("$FfmpegDir\LICENSE.txt", "$FfmpegDir\..\LICENSE.txt") | Where-Object { Test-Path $_ } | Select-Object -First 1
+  if (-not $license) { throw "Falta LICENSE.txt de FFmpeg junto a $FfmpegDir; es obligatorio distribuirlo." }
+  Copy-Item $license "$publish\ffmpeg\LICENSE.txt"
+  $ffver = (& "$publish\ffmpeg\ffmpeg.exe" -hide_banner -version | Select-Object -First 1)
+  @"
+Este programa incluye FFmpeg ($ffver), que se ejecuta como un proceso independiente.
+FFmpeg es software libre; su licencia está en LICENSE.txt de esta carpeta.
+Código fuente de FFmpeg: https://ffmpeg.org/download.html y https://github.com/FFmpeg/FFmpeg
+Compilación y scripts usados: https://github.com/BtbN/FFmpeg-Builds
+Si lo solicita, Angelito Systems le facilitará una copia del código fuente correspondiente: https://angelitosystems.net
+"@ | Set-Content "$publish\ffmpeg\LEEME-FFmpeg.txt" -Encoding utf8
   $includeFfmpeg = 1
 }
 
