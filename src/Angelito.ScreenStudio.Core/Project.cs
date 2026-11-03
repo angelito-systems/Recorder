@@ -82,7 +82,7 @@ public sealed record KeystrokeStyle(bool Visible = true, KeyLook Look = KeyLook.
 
 public enum ExportQuality { Fast, Balanced, High, Max }
 
-public enum ExportFormat { Mp4H264, Mp4Hevc, MkvH264, Wav, Png }
+public enum ExportFormat { Mp4H264, Mp4Hevc, MkvH264, Wav, Png, Mp4Av1 }
 
 /// <summary>Height is the short side of the output in pixels; 0 keeps the canvas window's own pixel size.</summary>
 /// <summary>Fps 0 keeps the recording's rate.</summary>
