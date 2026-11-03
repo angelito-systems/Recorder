@@ -49,7 +49,7 @@ public static class Exporter
 
     public static ExportPlan Build(StudioProject p, SessionManifest m, string sessionDir, IReadOnlyList<CursorEvent> cursor,
         EncoderChoice enc, string outPath, string graphPath, Func<int, (string Png, int X, int Y)?>? annotationImage = null,
-        IReadOnlyList<KeyEvent>? keys = null, Func<string, (string Png, int W, int H)?>? keyImage = null)
+        IReadOnlyList<KeyEvent>? keys = null, Func<string, (string Png, int W, int H)?>? keyImage = null, int vulkanDevice = -1)
     {
         if (p.Segments.Count == 0) throw new InvalidOperationException("No hay segmentos para exportar.");
         var (ow, oh) = Layout.OutputSize(m, p.Export, p.Canvas);
@@ -120,6 +120,13 @@ public static class Exporter
             {
                 var (sx, sy, sw, sh) = ZoomMath.ViewRect(p.Zooms, 0, m.Width, m.Height, p.Canvas);
                 g.Append(F($"[{last}]crop={Math.Round(sw)}:{Math.Round(sh)}:{Math.Round(sx)}:{Math.Round(sy)}:exact=1,scale={ow}:{oh}:flags=bicubic,setsar=1[vz];\n"));
+            }
+            else if (vulkanDevice >= 0)
+            {
+                // Same window on the GPU (libplacebo over Vulkan): equal speed on a discrete GPU, ~6× less CPU left to the encoder.
+                args.InsertRange(0, ["-init_hw_device", F($"vulkan=vk:{vulkanDevice}"), "-filter_hw_device", "vk"]);
+                var (vx, vy, vw, vh) = ZoomMath.FfmpegViewExpr(p.Zooms, p.Canvas, m.Width, m.Height, fps, "n");
+                g.Append($"[{last}]format=yuv420p,hwupload,libplacebo=w={ow}:h={oh}:crop_x='{vx}':crop_y='{vy}':crop_w='{vw}':crop_h='{vh}':format=yuv420p,hwdownload,format=yuv420p,setsar=1[vz];\n");
             }
             else
             {

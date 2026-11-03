@@ -194,6 +194,31 @@ public static class EncoderProbe
         return codec switch { "hevc" => CpuHevc, "av1" => CpuAv1, _ => Cpu };
     }
 
+    /// <summary>
+    /// Vulkan device for the zoom camera (libplacebo), or -1 for the CPU path. Each device runs the same animated 1080p crop;
+    /// the fastest wins, and only if it isn't slower than the CPU (an integrated GPU can be 4× slower than perspective).
+    /// </summary>
+    public static async Task<int> CameraGpuAsync()
+    {
+        const string Src = "testsrc2=s=1920x1080:r=60:d=1.5", X = "(100+200*n/60)";
+        var cpu = await Timed(["-f", "lavfi", "-i", Src, "-vf", $"format=yuv420p,perspective=x0='{X}':y0=50:x1='{X}+1280':y1=50:x2='{X}':y2=770:x3='{X}+1280':y3=770:eval=frame:sense=source,scale=1920:1080:flags=bicubic", "-f", "null", "-"]);
+        var (best, bestTime) = (-1, cpu * 1.1);
+        for (var d = 0; d < 4; d++)
+        {
+            var gpu = await Timed(["-init_hw_device", $"vulkan=vk:{d}", "-filter_hw_device", "vk", "-f", "lavfi", "-i", Src,
+                "-vf", $"format=yuv420p,hwupload,libplacebo=w=1920:h=1080:crop_x='{X}':crop_y=50:crop_w=1280:crop_h=720:format=yuv420p,hwdownload,format=yuv420p", "-f", "null", "-"]);
+            if (gpu < bestTime) (best, bestTime) = (d, gpu);
+        }
+        return best;
+    }
+
+    /// <summary>Wall time of an ffmpeg run, or +∞ if it fails (no such device, no libplacebo…).</summary>
+    private static async Task<double> Timed(IEnumerable<string> args)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        return await Works(["-loglevel", "error", .. args]) ? sw.Elapsed.TotalSeconds : double.PositiveInfinity;
+    }
+
     private static async Task<bool> Works(IEnumerable<string> args)
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));

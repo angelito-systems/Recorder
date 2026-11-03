@@ -47,10 +47,11 @@ public static class ZoomMath
     /// ffmpeg expressions for the view rectangle (x, y, w, h) per frame, for the perspective filter, whose only clock
     /// is "in" — the 1-based input frame number — so time is (in-1)/fps on the constant-rate stream it receives.
     /// </summary>
-    public static (string X, string Y, string W, string H) FfmpegViewExpr(IReadOnlyList<ZoomSegment> zooms, ProjectCanvas canvas, int width, int height, int fps)
+    /// <param name="frameVar">The filter's frame-number variable: perspective counts from 1 ("in-1"), libplacebo from 0 ("n").</param>
+    public static (string X, string Y, string W, string H) FfmpegViewExpr(IReadOnlyList<ZoomSegment> zooms, ProjectCanvas canvas, int width, int height, int fps, string frameVar = "in-1")
     {
         var (cw, ch) = canvas.Window(width, height);
-        var t = F($"((in-1)/{fps})");
+        var t = F($"(({frameVar})/{fps})");
         var z = new StringBuilder("1");
         var cx = new StringBuilder(F($"{canvas.X}"));
         var cy = new StringBuilder(F($"{canvas.Y}"));

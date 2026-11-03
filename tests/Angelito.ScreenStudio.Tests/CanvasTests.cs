@@ -30,10 +30,14 @@ public class CanvasTests
 
     /// <summary>Preview/export parity: the rendered frame mid-zoom equals the rectangle the preview shows.</summary>
     [Theory]
-    [InlineData(CanvasAspect.Source)]
-    [InlineData(CanvasAspect.Vertical)]
-    public async Task ExportMatchesViewRect(CanvasAspect aspect)
+    [InlineData(CanvasAspect.Source, false)]
+    [InlineData(CanvasAspect.Vertical, false)]
+    [InlineData(CanvasAspect.Source, true)]
+    [InlineData(CanvasAspect.Vertical, true)]
+    public async Task ExportMatchesViewRect(CanvasAspect aspect, bool gpu)
     {
+        var vk = gpu ? await EncoderProbe.CameraGpuAsync() : -1;
+        if (gpu && vk < 0) return; // no libplacebo/Vulkan GPU faster than the CPU here: the CPU path is what ships
         var dir = TempDir.Create("ass-canvas").FullName;
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "testsrc2=s=1280x720:r=30:d=3", "-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv420p", Path.Combine(dir, "screen.mp4")])).Code);
         var m = new SessionManifest { Width = 1280, Height = 720, Fps = 30, Complete = true };
@@ -43,7 +47,7 @@ public class CanvasTests
             Canvas = new ProjectCanvas(aspect, 0.4), Export = new ExportSettings(0, ExportQuality.High),
         };
         var outPath = Path.Combine(dir, "out.mp4");
-        var plan = Exporter.Build(p, m, dir, [], EncoderProbe.Cpu, outPath, Path.Combine(dir, "g.txt"));
+        var plan = Exporter.Build(p, m, dir, [], EncoderProbe.Cpu, outPath, Path.Combine(dir, "g.txt"), vulkanDevice: vk);
         await Exporter.RunAsync(plan, Path.Combine(dir, "g.txt"), _ => { }, CancellationToken.None);
 
         var (ow, oh) = Layout.OutputSize(m, p.Export, p.Canvas);
