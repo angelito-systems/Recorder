@@ -123,6 +123,9 @@
                 <RadioButton x:Name="RailKeys" Style="{StaticResource RailButton}" Tag="PageKeys" Checked="OnRail" ToolTip="Atajos de teclado" AutomationProperties.Name="Atajos de teclado">
                     <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE765;" FontSize="18"/>
                 </RadioButton>
+                <RadioButton x:Name="RailBackground" Style="{StaticResource RailButton}" Tag="PageBackground" Checked="OnRail" ToolTip="Fondo y márgenes" AutomationProperties.Name="Fondo y márgenes">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE790;" FontSize="18"/>
+                </RadioButton>
                 <RadioButton x:Name="RailFormat" Style="{StaticResource RailButton}" Tag="PageFormat" Checked="OnRail" ToolTip="Formato y encuadre" AutomationProperties.Name="Formato y encuadre">
                     <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE799;" FontSize="18"/>
                 </RadioButton>
@@ -326,6 +329,35 @@
                         <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0" Text="Arrastra el atajo en la vista previa para moverlo."/>
                     </StackPanel>
                     </StackPanel>
+                    <StackPanel x:Name="PageBackground" Visibility="Collapsed" Tag="Fondo y márgenes">
+                        <CheckBox x:Name="BgEnabled" Content="Mostrar la grabación sobre un fondo" Click="OnBgEdit"/>
+                        <StackPanel x:Name="BgControls" Margin="0,8,0,0">
+                            <TextBlock Text="Fondo"/>
+                            <WrapPanel Margin="0,6,0,6">
+                                <Button Style="{StaticResource Swatch}" Width="34" Height="34" Tag="#1E1B4B,#7C3AED" Click="OnBgPreset" ToolTip="Violeta">
+                                    <Button.Background><LinearGradientBrush EndPoint="1,1"><GradientStop Color="#1E1B4B"/><GradientStop Color="#7C3AED" Offset="1"/></LinearGradientBrush></Button.Background>
+                                </Button>
+                                <Button Style="{StaticResource Swatch}" Width="34" Height="34" Tag="#0F172A,#2563EB" Click="OnBgPreset" ToolTip="Azul">
+                                    <Button.Background><LinearGradientBrush EndPoint="1,1"><GradientStop Color="#0F172A"/><GradientStop Color="#2563EB" Offset="1"/></LinearGradientBrush></Button.Background>
+                                </Button>
+                                <Button Style="{StaticResource Swatch}" Width="34" Height="34" Tag="#F97316,#DB2777" Click="OnBgPreset" ToolTip="Atardecer">
+                                    <Button.Background><LinearGradientBrush EndPoint="1,1"><GradientStop Color="#F97316"/><GradientStop Color="#DB2777" Offset="1"/></LinearGradientBrush></Button.Background>
+                                </Button>
+                                <Button Style="{StaticResource Swatch}" Width="34" Height="34" Tag="#064E3B,#10B981" Click="OnBgPreset" ToolTip="Verde">
+                                    <Button.Background><LinearGradientBrush EndPoint="1,1"><GradientStop Color="#064E3B"/><GradientStop Color="#10B981" Offset="1"/></LinearGradientBrush></Button.Background>
+                                </Button>
+                                <Button Style="{StaticResource Swatch}" Width="34" Height="34" Tag="#E5E7EB,#F9FAFB" Click="OnBgPreset" ToolTip="Claro">
+                                    <Button.Background><LinearGradientBrush EndPoint="1,1"><GradientStop Color="#E5E7EB"/><GradientStop Color="#F9FAFB" Offset="1"/></LinearGradientBrush></Button.Background>
+                                </Button>
+                                <Button Style="{StaticResource Swatch}" Width="34" Height="34" Tag="#111111,#111111" Click="OnBgPreset" ToolTip="Negro" Background="#111111"/>
+                            </WrapPanel>
+                            <TextBlock x:Name="BgPaddingText"/>
+                            <Slider x:Name="BgPadding" Minimum="0" Maximum="0.2" SmallChange="0.005" LargeChange="0.02" ValueChanged="OnBgEdit"/>
+                            <TextBlock x:Name="BgRadiusText"/>
+                            <Slider x:Name="BgRadius" Minimum="0" Maximum="0.08" SmallChange="0.002" LargeChange="0.01" ValueChanged="OnBgEdit"/>
+                            <TextBlock Style="{StaticResource Hint}" Text="La cámara, los textos y los atajos se colocan sobre todo el fotograma, también encima del fondo."/>
+                        </StackPanel>
+                    </StackPanel>
                     <StackPanel x:Name="PageFormat" Visibility="Collapsed" Tag="Formato y encuadre">
                     <StackPanel x:Name="FormatSection">
                     <ComboBox x:Name="FormatBox" SelectionChanged="OnFormatEdit">
@@ -387,6 +419,9 @@
             <Border Grid.Column="2" Background="#0D0D12" Margin="0,0,12,0" CornerRadius="10" ClipToBounds="True">
                 <Viewbox Margin="12" Stretch="Uniform">
                     <Grid x:Name="Stage" ClipToBounds="True" Background="Black" MouseLeftButtonDown="OnStageClick" MouseMove="OnStageMove" MouseLeftButtonUp="OnStageUp">
+                        <!-- The screen layer; with a background it shrinks to a rounded card (same rect as Layout.ScreenRect). -->
+                        <Grid x:Name="ScreenFrame" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform><ScaleTransform x:Name="ScreenScale"/></Grid.RenderTransform>
                         <Canvas x:Name="ZoomHost" HorizontalAlignment="Left" VerticalAlignment="Top" MouseMove="OnAnnMove" MouseLeftButtonUp="OnAnnUp">
                             <Canvas.RenderTransform><MatrixTransform x:Name="ZoomTransform"/></Canvas.RenderTransform>
                             <MediaElement x:Name="ScreenMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Fill" IsMuted="True"/>
@@ -394,6 +429,7 @@
                             <Canvas x:Name="RingLayer" IsHitTestVisible="False"/>
                             <Canvas x:Name="HandleLayer"/>
                         </Canvas>
+                        </Grid>
                         <Border x:Name="CamFrame" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="SizeAll"
                                 MouseLeftButtonDown="OnCamDown" MouseMove="OnCamMove" MouseLeftButtonUp="OnCamUp">
                             <MediaElement x:Name="CamMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Fill"

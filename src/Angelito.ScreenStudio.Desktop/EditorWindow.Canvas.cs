@@ -18,8 +18,44 @@ public partial class EditorWindow
     {
         Stage.Width = SW;
         Stage.Height = SH;
+        RefreshBackground();
         FormatBox.SelectedIndex = (int)P.Canvas.Aspect;
         FramingHint.Visibility = P.Canvas.Aspect == CanvasAspect.Source ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>Preview of <see cref="BackgroundStyle"/>: same rect as Layout.ScreenRect, on the stage's units.</summary>
+    private void RefreshBackground()
+    {
+        var bg = P.Background;
+        var (x, y, w, h, r) = Layout.ScreenRect((int)Math.Round(SW), (int)Math.Round(SH), bg);
+        double kx = w / SW, ky = h / SH;
+        ScreenScale.ScaleX = kx;
+        ScreenScale.ScaleY = ky;
+        // The clip is in the frame's own (unscaled) units, so the radius is divided by the scale to land at r on screen.
+        ScreenFrame.Clip = bg.Enabled ? new System.Windows.Media.RectangleGeometry(new Rect(0, 0, SW, SH), r / kx, r / ky) : null;
+        Stage.Background = bg.Enabled
+            ? new System.Windows.Media.LinearGradientBrush(Brush(bg.Color1), Brush(bg.Color2), new Point(0, 0), new Point(1, 1))
+            : System.Windows.Media.Brushes.Black;
+        BgEnabled.IsChecked = bg.Enabled;
+        BgControls.IsEnabled = bg.Enabled;
+        BgPadding.Value = bg.Padding;
+        BgRadius.Value = bg.Radius;
+        BgPaddingText.Text = $"Margen: {bg.Padding * 100:0.#} %";
+        BgRadiusText.Text = $"Esquinas redondeadas: {bg.Radius * 100:0.#} %";
+        static System.Windows.Media.Color Brush(string hex) => (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
+    }
+
+    private void OnBgEdit(object sender, RoutedEventArgs e)
+    {
+        if (_refreshing) return;
+        var key = sender is Slider ? "bgslider" : "bg" + Guid.NewGuid(); // a slider drag is one undo step
+        Commit(P with { Background = P.Background with { Enabled = BgEnabled.IsChecked == true, Padding = Math.Round(BgPadding.Value, 3), Radius = Math.Round(BgRadius.Value, 3) } }, key);
+    }
+
+    private void OnBgPreset(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag } || tag.Split(',') is not [var c1, var c2]) return;
+        Commit(P with { Background = P.Background with { Enabled = true, Color1 = c1, Color2 = c2 } }, "bgpreset" + Guid.NewGuid());
     }
 
     private void OnFormatEdit(object sender, SelectionChangedEventArgs e)

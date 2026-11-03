@@ -71,6 +71,13 @@ public enum CanvasAspect { Source, Wide, Vertical, Square, Classic }
 /// Output frame shape. The canvas shows the largest window of its aspect that fits the source; X/Y (normalized source
 /// coordinates) is where that window is centered when no zoom is active, so reframing is editable, never automatic.
 /// </summary>
+/// <summary>
+/// The recording shown as a rounded card on a gradient. Padding is the margin on each side as a fraction of the output
+/// size (the screen keeps its aspect: it is scaled by 1 − 2·Padding); Radius is the corner radius as a fraction of the
+/// output's short side. Webcam, texts and shortcuts stay positioned on the whole frame.
+/// </summary>
+public sealed record BackgroundStyle(bool Enabled = false, string Color1 = "#1E1B4B", string Color2 = "#7C3AED", double Padding = 0.06, double Radius = 0.02);
+
 public sealed record ProjectCanvas(CanvasAspect Aspect = CanvasAspect.Source, double X = 0.5, double Y = 0.5)
 {
     public double Ratio(double w, double h) => Aspect switch
@@ -118,6 +125,7 @@ public sealed record StudioProject
     public AudioMix Audio { get; init; } = new();
     public ExportSettings Export { get; init; } = new();
     public ProjectCanvas Canvas { get; init; } = new();
+    public BackgroundStyle Background { get; init; } = new();
     public KeystrokeStyle Keys { get; init; } = new();
     public List<TextItem> Texts { get; init; } = [];
     public List<Cue> Subtitles { get; init; } = [];
