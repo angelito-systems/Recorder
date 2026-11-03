@@ -27,13 +27,13 @@ public static class Layout
 public sealed record ExportPlan(List<string> Args, string FilterGraph, double Duration, Dictionary<string, string> Files);
 
 /// <summary>Turns a project into one ffmpeg invocation (single process, whole graph), mirroring the preview's layer order:
-/// screen → click rings → zoom → webcam → cuts → encode.</summary>
+/// screen → annotations → click rings → zoom → webcam → texts → cuts → encode.</summary>
 public static class Exporter
 {
     private static string F(FormattableString s) => s.ToString(CultureInfo.InvariantCulture);
 
     public static ExportPlan Build(StudioProject p, SessionManifest m, string sessionDir, IReadOnlyList<CursorEvent> cursor,
-        EncoderChoice enc, string outPath, string graphPath)
+        EncoderChoice enc, string outPath, string graphPath, Func<int, (string Png, int X, int Y)?>? annotationImage = null)
     {
         if (p.Segments.Count == 0) throw new InvalidOperationException("No hay segmentos para exportar.");
         var (ow, oh) = Layout.OutputSize(m, p.Export);
@@ -47,6 +47,34 @@ public static class Exporter
         var srcEnd = p.Segments.Max(s => s.End) + 1;
         g.Append(F($"[0:v]fps={fps},setpts=PTS-STARTPTS,format=yuv420p[v0];\n"));
         var last = "v0";
+
+        // Annotations in source pixels, so they stay on the content under zoom (same as preview).
+        // Masks are computed here; vector shapes come pre-rendered by the UI (the preview's own drawing) as PNGs.
+        for (var i = 0; i < p.Annotations.Count; i++)
+        {
+            var a = p.Annotations[i];
+            var en = F($"enable='between(t,{a.Start:F3},{a.End:F3})'");
+            if (a.IsMask)
+            {
+                var (bx, by, bw, bh) = a.BoxPx(m.Width, m.Height);
+                // yuv420p crops must be even; grow outward so the mask never uncovers an edge pixel.
+                int x0 = Math.Max(0, bx & ~1), y0 = Math.Max(0, by & ~1);
+                int w = Math.Min(m.Width - x0, Layout.Even(bx + bw - x0 + 1)), h = Math.Min(m.Height - y0, Layout.Even(by + bh - y0 + 1));
+                if (w < 4 || h < 4) continue;
+                var fx = a.Kind == AnnotationKind.Blur
+                    ? BlurChain(w, h)
+                    : F($"scale={Math.Max(1, w / PixelBlock)}:{Math.Max(1, h / PixelBlock)}:flags=area,scale={w}:{h}:flags=neighbor");
+                g.Append(F($"[{last}]split[ma{i}][mb{i}];[mb{i}]crop={w}:{h}:{x0}:{y0},{fx}[mc{i}];[ma{i}][mc{i}]overlay={x0}:{y0}:{en}[an{i}];\n"));
+                last = $"an{i}";
+            }
+            else if (annotationImage?.Invoke(i) is { } img)
+            {
+                args.AddRange(["-i", img.Png]);
+                g.Append(F($"[{last}][{input}:v]overlay={img.X}:{img.Y}:{en}[an{i}];\n"));
+                last = $"an{i}";
+                input++;
+            }
+        }
 
         // Click rings, drawn in source pixels so they zoom with the content (same as preview).
         var clicks = p.Cursor.ShowClicks ? cursor.Where(c => c.K != CursorKind.Move && c.T >= 0 && c.T < srcEnd).ToList() : [];
@@ -154,6 +182,25 @@ public static class Exporter
             return delay > 0 ? F($"adelay={delay * 1000:F0}:all=1,") : F($"atrim=start={-delay:F4},asetpts=PTS-STARTPTS,");
         return delay > 0 ? F($"tpad=start_duration={delay:F4}:start_mode=clone,") : F($"trim=start={-delay:F4},setpts=PTS-STARTPTS,");
     }
+
+    public const int PixelBlock = 16;
+
+    public const int BlurDownscale = 6;
+
+    /// <summary>
+    /// Privacy blur whose strength doesn't depend on the region size: boxblur's radius is capped by the plane size
+    /// (yuv420p chroma is half size), so small regions are shrunk first, blurred, then scaled back up.
+    /// </summary>
+    private static string BlurChain(int w, int h)
+    {
+        int sw = Math.Max(2, Layout.Even(w / (double)BlurDownscale)), sh = Math.Max(2, Layout.Even(h / (double)BlurDownscale));
+        var r = Math.Min(6, Math.Min(sw, sh) / 4 - 1);
+        var blur = r >= 1 ? F($",boxblur={r}:3") : "";
+        return F($"scale={sw}:{sh}:flags=area{blur},scale={w}:{h}:flags=bicubic");
+    }
+
+    /// <summary>Preview BlurEffect radius approximating <see cref="BlurChain"/>.</summary>
+    public static double PreviewBlurRadius(int w, int h) => BlurDownscale * (Math.Clamp(Math.Min(w, h) / BlurDownscale / 4 - 1, 1, 6) + 2) * 2;
 
     /// <summary>Box padding around text, shared with the preview.</summary>
     public static int TextPad(int fontPx) => Math.Max(2, (int)Math.Round(fontPx * 0.3));

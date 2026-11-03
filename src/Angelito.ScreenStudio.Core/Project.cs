@@ -34,6 +34,26 @@ public sealed record Cue(double Start, double End, string Text);
 /// <summary>Y is the vertical center normalized to the output frame. Burn draws subtitles into the exported video.</summary>
 public sealed record SubtitleStyle(double Size = 0.045, double Y = 0.9, string Color = "#FFFFFF", bool Background = true, bool Burn = true);
 
+public enum AnnotationKind { Rectangle, Ellipse, Arrow, Highlight, Blur, Pixelate }
+
+/// <summary>
+/// A shape on the recording, in source space so it stays on the content under zoom. (X,Y)→(X2,Y2) are normalized to the
+/// source frame: the arrow's tail→head, or two opposite corners for the other kinds. Thickness is in source pixels.
+/// </summary>
+public sealed record Annotation(double Start, double End, AnnotationKind Kind, double X, double Y, double X2, double Y2,
+    string Color = "#EF4444", double Thickness = 6)
+{
+    [JsonIgnore] public bool IsMask => Kind is AnnotationKind.Blur or AnnotationKind.Pixelate;
+
+    /// <summary>Box in source pixels, corners normalized (for masks and rectangle-like shapes).</summary>
+    public (int X, int Y, int W, int H) BoxPx(int width, int height)
+    {
+        int x = (int)Math.Round(Math.Min(X, X2) * width), y = (int)Math.Round(Math.Min(Y, Y2) * height);
+        int w = (int)Math.Round(Math.Abs(X2 - X) * width), h = (int)Math.Round(Math.Abs(Y2 - Y) * height);
+        return (x, y, Math.Max(1, w), Math.Max(1, h));
+    }
+}
+
 public enum ExportQuality { Fast, Balanced, High }
 
 /// <summary>Height 0 keeps the source size.</summary>
@@ -55,6 +75,7 @@ public sealed record StudioProject
     public ExportSettings Export { get; init; } = new();
     public List<TextItem> Texts { get; init; } = [];
     public List<Cue> Subtitles { get; init; } = [];
+    public List<Annotation> Annotations { get; init; } = [];
     public SubtitleStyle SubtitleStyle { get; init; } = new();
     public static StudioProject FromSession(double duration, IReadOnlyList<CursorEvent> cursor, int width, int height) => new()
     {

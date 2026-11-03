@@ -164,6 +164,7 @@ public partial class EditorWindow : Window
         UndoBtn.IsEnabled = _history.CanUndo;
         RedoBtn.IsEnabled = _history.CanRedo;
         RefreshText();
+        RefreshAnnotations();
         Title = $"{(_dirty ? "• " : "")}{App.Product} — Editor";
         _refreshing = false;
         DrawTimeline();
@@ -232,6 +233,7 @@ public partial class EditorWindow : Window
         }
 
         ApplyText(t);
+        ApplyAnnotations(t);
         TimeText.Text = $"{Fmt(t)} / {Fmt(_duration)}";
         var w = Timeline.ActualWidth;
         _playhead.X1 = _playhead.X2 = t / _duration * w;
@@ -293,7 +295,7 @@ public partial class EditorWindow : Window
 
     // ---------- timeline ----------
 
-    private const double RulerH = 18, SegTop = 26, SegH = 40, ZoomTop = 74, ZoomH = 26, TextTop = 108, CueTop = 132, RowH = 20, ClickTop = 158;
+    private const double RulerH = 18, SegTop = 26, SegH = 40, ZoomTop = 74, ZoomH = 26, TextTop = 108, CueTop = 132, AnnTop = 156, RowH = 20, ClickTop = 182;
 
     private void OnTimelineResize(object sender, SizeChangedEventArgs e) => DrawTimeline();
 
@@ -347,6 +349,7 @@ public partial class EditorWindow : Window
         }
 
         DrawTextRows(X);
+        DrawAnnotationRow(X);
 
         foreach (var c in _clicks)
             Timeline.Children.Add(new Line { X1 = X(c.T), X2 = X(c.T), Y1 = ClickTop, Y2 = ClickTop + 10, Stroke = Brushes.Goldenrod, StrokeThickness = 1 });
@@ -556,11 +559,14 @@ public partial class EditorWindow : Window
         _exportCts = new CancellationTokenSource();
         var graph = System.IO.Path.Combine(App.DataDir, $"export-{Environment.ProcessId}.graph");
         var tmp = dlg.FileName + ".part.mp4";
+        List<string> pngs = [];
         try
         {
             s_exportEncoder ??= EncoderProbe.ForExportAsync();
             var enc = await s_exportEncoder;
-            var plan = Exporter.Build(P, _m, _sessionDir, _cursor, enc, tmp, graph);
+            var (annImage, annFiles) = RenderAnnotationImages();
+            pngs = annFiles;
+            var plan = Exporter.Build(P, _m, _sessionDir, _cursor, enc, tmp, graph, annImage);
             await Exporter.RunAsync(plan, graph, v => Dispatcher.BeginInvoke(() => ExportProgress.Value = v), _exportCts.Token);
             File.Move(tmp, dlg.FileName, overwrite: true);
             MessageBox.Show(this, $"Exportado con {enc.Name}:\n{dlg.FileName}", App.Product);
@@ -577,6 +583,7 @@ public partial class EditorWindow : Window
             ExportBtn.IsEnabled = true;
             ExportProgress.Visibility = CancelExportBtn.Visibility = Visibility.Collapsed;
             TryDelete(graph);
+            pngs.ForEach(TryDelete);
         }
     }
 

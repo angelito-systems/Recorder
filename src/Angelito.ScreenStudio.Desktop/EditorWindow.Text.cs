@@ -16,8 +16,9 @@ public partial class EditorWindow
     private (FrameworkElement El, Point Grab, int Text, bool Cue)? _textDrag;
 
     /// <summary>Single selection across zooms, texts and subtitles.</summary>
-    private void Select(int zoom = -1, int text = -1, int cue = -1, bool refresh = true)
+    private void Select(int zoom = -1, int text = -1, int cue = -1, int ann = -1, bool refresh = true)
     {
+        _selectedAnn = ann;
         _selectedZoom = zoom;
         _selectedText = text;
         _selectedCue = cue;

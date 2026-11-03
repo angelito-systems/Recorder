@@ -56,6 +56,58 @@ public class TimelineEditTests
     }
 }
 
+public class MaskTests
+{
+    /// <summary>Privacy check: the masked area must actually change, the rest must not.</summary>
+    [Theory]
+    [InlineData(AnnotationKind.Blur)]
+    [InlineData(AnnotationKind.Pixelate)]
+    public async Task MaskChangesOnlyItsRegion(AnnotationKind kind)
+    {
+        var dir = Directory.CreateTempSubdirectory("ass-mask").FullName;
+        Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=1", "-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv420p", Path.Combine(dir, "screen.mp4")])).Code);
+        var m = new SessionManifest { Width = 640, Height = 360, Fps = 30, Complete = true };
+        // Mask the left half (odd pixel bounds on purpose: the exporter must grow, not shrink, the box).
+        var p = new StudioProject { Segments = [new(0, 1)], Annotations = [new(0, 1, kind, 0.001, 0.001, 0.5, 0.999)] };
+        var outPath = Path.Combine(dir, "out.mp4");
+        var plan = Exporter.Build(p, m, dir, [], EncoderProbe.Cpu, outPath, Path.Combine(dir, "g.txt"));
+        await Exporter.RunAsync(plan, Path.Combine(dir, "g.txt"), _ => { }, CancellationToken.None);
+
+        Assert.True(await Psnr(dir, "crop=300:340:10:10") < 30, "masked area is still close to the original");
+        Assert.True(await Psnr(dir, "crop=300:340:330:10") > 35, "unmasked area changed");
+    }
+
+    [Fact]
+    public async Task SmallBlurStillDestroysDetail()
+    {
+        var dir = Directory.CreateTempSubdirectory("ass-mask").FullName;
+        // The real case: small black text (a "password") on white, under a 64×24 mask.
+        var font = Exporter.Font(false).Replace('\\', '/').Replace(":", "\\:");
+        Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", $"color=white:s=640x360:r=30:d=1,drawtext=fontfile='{font}':text='clave 1234':fontsize=15:fontcolor=black:x=194:y=112",
+            "-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv420p", Path.Combine(dir, "screen.mp4")])).Code);
+        var m = new SessionManifest { Width = 640, Height = 360, Fps = 30, Complete = true };
+        var p = new StudioProject { Segments = [new(0, 1)], Annotations = [new(0, 1, AnnotationKind.Blur, 0.3, 0.3, 0.4, 0.3667)] };
+        var plan = Exporter.Build(p, m, dir, [], EncoderProbe.Cpu, Path.Combine(dir, "out.mp4"), Path.Combine(dir, "g.txt"));
+        await Exporter.RunAsync(plan, Path.Combine(dir, "g.txt"), _ => { }, CancellationToken.None);
+        Assert.True(await Psnr(dir, "crop=56:16:196:112") < 20);
+    }
+
+    private static async Task<double> Psnr(string dir, string crop)
+    {
+        double result = double.NaN;
+        using var f = new FfmpegProcess(["-i", Path.Combine(dir, "out.mp4"), "-i", Path.Combine(dir, "screen.mp4"),
+            "-lavfi", $"[0:v]{crop}[a];[1:v]{crop}[b];[a][b]psnr", "-f", "null", "-"]);
+        f.StdErr += l =>
+        {
+            var i = l.IndexOf("average:", StringComparison.Ordinal);
+            if (i >= 0) result = double.Parse(l[(i + 8)..].Split(' ')[0], System.Globalization.CultureInfo.InvariantCulture);
+        };
+        f.Start();
+        await f.WaitAsync();
+        return result;
+    }
+}
+
 public class TimeMappingTests
 {
     // Source 0-10 with 4-6 removed: output is 8 s long.

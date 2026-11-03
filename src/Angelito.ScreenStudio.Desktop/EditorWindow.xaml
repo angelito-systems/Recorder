@@ -26,7 +26,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="5"/>
-            <RowDefinition Height="220" MinHeight="160"/>
+            <RowDefinition Height="250" MinHeight="180"/>
         </Grid.RowDefinitions>
 
         <!-- Top bar -->
@@ -58,10 +58,12 @@
             <Border Background="#0D0D12" Margin="12,0,0,0" CornerRadius="8" ClipToBounds="True">
                 <Viewbox Margin="12" Stretch="Uniform">
                     <Grid x:Name="Stage" ClipToBounds="True" Background="Black" MouseLeftButtonDown="OnStageClick">
-                        <Canvas x:Name="ZoomHost" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <Canvas x:Name="ZoomHost" HorizontalAlignment="Left" VerticalAlignment="Top" MouseMove="OnAnnMove" MouseLeftButtonUp="OnAnnUp">
                             <Canvas.RenderTransform><MatrixTransform x:Name="ZoomTransform"/></Canvas.RenderTransform>
                             <MediaElement x:Name="ScreenMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Fill" IsMuted="True"/>
+                            <Canvas x:Name="AnnLayer"/>
                             <Canvas x:Name="RingLayer" IsHitTestVisible="False"/>
+                            <Canvas x:Name="HandleLayer"/>
                         </Canvas>
                         <Border x:Name="CamFrame" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="SizeAll"
                                 MouseLeftButtonDown="OnCamDown" MouseMove="OnCamMove" MouseLeftButtonUp="OnCamUp">
@@ -148,6 +150,36 @@
                     <CheckBox x:Name="SubBg" Content="Fondo" Click="OnSubStyleEdit"/>
                     <CheckBox x:Name="SubBurn" Content="Incrustar en el video exportado" Click="OnSubStyleEdit" Margin="0,4,0,0"/>
 
+                    <TextBlock Style="{StaticResource Section}" Text="Anotaciones"/>
+                    <WrapPanel>
+                        <Button Content="Flecha" Tag="Arrow" Click="OnAddAnn" Margin="0,0,6,6"/>
+                        <Button Content="Rectángulo" Tag="Rectangle" Click="OnAddAnn" Margin="0,0,6,6"/>
+                        <Button Content="Círculo" Tag="Ellipse" Click="OnAddAnn" Margin="0,0,6,6"/>
+                        <Button Content="Resaltado" Tag="Highlight" Click="OnAddAnn" Margin="0,0,6,6"/>
+                        <Button Content="Desenfoque" Tag="Blur" Click="OnAddAnn" Margin="0,0,6,6" ToolTip="Oculta datos privados"/>
+                        <Button Content="Pixelado" Tag="Pixelate" Click="OnAddAnn" Margin="0,0,6,6" ToolTip="Oculta datos privados"/>
+                    </WrapPanel>
+                    <StackPanel x:Name="AnnPanel">
+                        <TextBlock x:Name="AnnInfo" Style="{StaticResource Hint}"/>
+                        <StackPanel x:Name="AnnStyle">
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <Button Style="{StaticResource Swatch}" Background="#EF4444" Tag="#EF4444" Click="OnAnnColor"/>
+                                <Button Style="{StaticResource Swatch}" Background="#FACC15" Tag="#FACC15" Click="OnAnnColor"/>
+                                <Button Style="{StaticResource Swatch}" Background="#8B5CF6" Tag="#8B5CF6" Click="OnAnnColor"/>
+                                <Button Style="{StaticResource Swatch}" Background="#22C55E" Tag="#22C55E" Click="OnAnnColor"/>
+                                <Button Style="{StaticResource Swatch}" Background="#FFFFFF" Tag="#FFFFFF" Click="OnAnnColor"/>
+                            </StackPanel>
+                            <TextBlock Text="Grosor" Margin="0,6,0,0"/>
+                            <Slider x:Name="AnnThickness" Minimum="2" Maximum="24" ValueChanged="OnAnnThickness"/>
+                        </StackPanel>
+                        <WrapPanel Margin="0,6,0,0">
+                            <Button Content="Inicio = cabezal" Click="OnAnnStartHere"/>
+                            <Button Content="Fin = cabezal" Click="OnAnnEndHere" Margin="6,0,0,0"/>
+                            <Button x:Name="DelAnnBtn" Content="Quitar" Click="OnDeleteAnn" Margin="6,0,0,0"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Arrastra la forma en la vista previa para moverla y sus puntos para cambiar el tamaño."/>
+
                     <TextBlock Style="{StaticResource Section}" Text="Cursor"/>
                     <CheckBox x:Name="ShowClicks" Content="Resaltar clics" Click="OnCursorEdit"/>
                     <TextBlock Text="Tamaño" Margin="0,6,0,0"/>
@@ -228,7 +260,7 @@
                 <Button x:Name="PlayBtn" Content="▶" Width="44" Click="OnPlay" ToolTip="Reproducir / pausar (Espacio)"/>
                 <TextBlock x:Name="TimeText" VerticalAlignment="Center" Margin="12,0" FontFamily="Cascadia Mono, Consolas"/>
                 <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" HorizontalAlignment="Right"
-                           Text="Filas: clips · zoom · texto · subtítulos · clics    Espacio: reproducir · S: dividir · Supr: eliminar tramo · ←/→: fotograma · Ctrl+Z/Y"/>
+                           Text="Filas: clips · zoom · texto · subtítulos · anotaciones · clics    Espacio: reproducir · S: dividir · Supr: eliminar tramo · ←/→: fotograma · Ctrl+Z/Y"/>
             </DockPanel>
             <Border CornerRadius="6" Background="#14141B" ClipToBounds="True">
                 <Canvas x:Name="Timeline" Background="Transparent" SizeChanged="OnTimelineResize"

@@ -7,7 +7,7 @@ namespace Angelito.ScreenStudio.Desktop;
 /// <summary>Timeline mouse: drag bodies to move, edges to trim; magnetic snapping (hold Alt to disable); click to seek.</summary>
 public partial class EditorWindow
 {
-    private enum Row { Segment, Zoom, Text, Cue }
+    private enum Row { Segment, Zoom, Text, Cue, Annotation }
 
     private sealed record DragState(Row Row, int Index, DragMode Mode, double X0, double S0, double E0, string Key)
     {
@@ -24,6 +24,7 @@ public partial class EditorWindow
         Row.Segment => P.Segments.Select(s => (s.Start, s.End)).ToList(),
         Row.Zoom => P.Zooms.Select(z => (z.Start, z.End)).ToList(),
         Row.Text => P.Texts.Select(t => (t.Start, t.End)).ToList(),
+        Row.Annotation => P.Annotations.Select(a => (a.Start, a.End)).ToList(),
         _ => P.Subtitles.Select(c => (c.Start, c.End)).ToList(),
     };
 
@@ -34,14 +35,15 @@ public partial class EditorWindow
             case Row.Segment: { var l = P.Segments.ToList(); l[i] = new Segment(s, e); return P with { Segments = l }; }
             case Row.Zoom: { var l = P.Zooms.ToList(); l[i] = l[i] with { Start = s, End = e }; return P with { Zooms = l }; }
             case Row.Text: { var l = P.Texts.ToList(); l[i] = l[i] with { Start = s, End = e }; return P with { Texts = l }; }
+            case Row.Annotation: { var l = P.Annotations.ToList(); l[i] = l[i] with { Start = s, End = e }; return P with { Annotations = l }; }
             default: { var l = P.Subtitles.ToList(); l[i] = l[i] with { Start = s, End = e }; return P with { Subtitles = l }; }
         }
     }
 
-    /// <summary>Clips, zooms and subtitles may not overlap their neighbors (lists are kept in time order); texts can stack.</summary>
+    /// <summary>Clips, zooms and subtitles may not overlap their neighbors (lists are kept in time order); texts and annotations can stack.</summary>
     private (double Lo, double Hi) Bounds(Row r, int i)
     {
-        if (r == Row.Text) return (0, _duration);
+        if (r is Row.Text or Row.Annotation) return (0, _duration);
         var items = Items(r);
         return (i > 0 ? items[i - 1].E : 0, i < items.Count - 1 ? items[i + 1].S : _duration);
     }
@@ -50,7 +52,8 @@ public partial class EditorWindow
         y >= SegTop && y <= SegTop + SegH ? Row.Segment :
         y >= ZoomTop && y <= ZoomTop + ZoomH ? Row.Zoom :
         y >= TextTop && y <= TextTop + RowH ? Row.Text :
-        y >= CueTop && y <= CueTop + RowH ? Row.Cue : null;
+        y >= CueTop && y <= CueTop + RowH ? Row.Cue :
+        y >= AnnTop && y <= AnnTop + RowH ? Row.Annotation : null;
 
     private (Row Row, int Index, DragMode? Mode)? HitTest(Point p)
     {
@@ -93,6 +96,7 @@ public partial class EditorWindow
                 case Row.Zoom: Select(zoom: h.Index); break;
                 case Row.Text: Select(text: h.Index); break;
                 case Row.Cue: Select(cue: h.Index); break;
+                case Row.Annotation: Select(ann: h.Index); break;
             }
             if (h.Mode is { } mode)
             {

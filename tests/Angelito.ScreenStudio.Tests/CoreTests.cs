@@ -162,11 +162,15 @@ public class ExportIntegrationTests
         {
             Texts = [new(0.2, 1.5, "Título 100% \"real\"\r\ncon dos líneas")],
             Subtitles = [new(0.5, 1.8, "Subtítulo: a\\b")],
+            Annotations = [new(0, 1.5, AnnotationKind.Blur, 0.1, 0.1, 0.3, 0.3), new(0.5, 3, AnnotationKind.Pixelate, 0.5, 0.5, 0.9, 0.7),
+                new(0, 3, AnnotationKind.Arrow, 0.2, 0.2, 0.4, 0.4)],
         };
+        var png = Path.Combine(dir, "arrow.png");
+        Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "color=c=red@0.5:s=40x30,format=rgba", "-frames:v", "1", png])).Code);
         Assert.NotEmpty(p.Zooms);
 
         var outPath = Path.Combine(dir, "out.mp4");
-        var plan = Exporter.Build(p, m, dir, cursor, EncoderProbe.Cpu, outPath, Path.Combine(dir, "graph.txt"));
+        var plan = Exporter.Build(p, m, dir, cursor, EncoderProbe.Cpu, outPath, Path.Combine(dir, "graph.txt"), i => p.Annotations[i].IsMask ? null : (png, 100, 60));
         var last = 0.0;
         await Exporter.RunAsync(plan, Path.Combine(dir, "graph.txt"), v => last = v, CancellationToken.None);
 
