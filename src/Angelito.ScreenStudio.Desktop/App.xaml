@@ -1,0 +1,26 @@
+﻿<Application x:Class="Angelito.ScreenStudio.Desktop.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ThemeMode="System"
+             StartupUri="RecorderWindow.xaml">
+    <Application.Resources>
+        <!-- Brand accent; everything else follows the Windows light/dark Fluent theme. -->
+        <SolidColorBrush x:Key="Brand" Color="#7C5CFA"/>
+        <SolidColorBrush x:Key="Rec" Color="#E5484D"/>
+        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{StaticResource Brand}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="14,6"/>
+        </Style>
+        <Style x:Key="Section" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,14,0,6"/>
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Opacity" Value="0.6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+    </Application.Resources>
+</Application>
