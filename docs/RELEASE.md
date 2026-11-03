@@ -28,10 +28,15 @@ Por defecto **no** se incluye: la app usa el FFmpeg del PATH (o `ffmpeg\ffmpeg.e
 - Compilación **LGPL** (sin x264/x265): permitida en software comercial si se cumplen sus condiciones (aviso, enlace a la fuente). Exportará con NVENC/QSV/AMF; sin GPU compatible no habrá codificador H.264 por CPU.
 - Compilación **GPL** (p. ej. la "essentials" de gyan.dev usada en desarrollo): obliga a ofrecer el código fuente de FFmpeg. La app sigue siendo independiente porque FFmpeg corre como proceso separado.
 
-Decisión comercial pendiente; consultar asesoría legal.
+Compilación elegida para incluir: **FFmpeg 8.1 GPL de [BtbN](https://github.com/BtbN/FFmpeg-Builds)** (`ffmpeg-n8.1-latest-win64-gpl-8.1.zip`). Trae x264/x265/libaom (exportar sin GPU), NVENC/QSV/AMF y libplacebo/Vulkan. Con `-FfmpegDir <carpeta bin>` el script copia `ffmpeg.exe`, su `LICENSE.txt` (obligatorio, falla si no está) y un `LEEME-FFmpeg.txt` con la versión y dónde obtener el código fuente. El código de la app sigue siendo MIT: FFmpeg corre como proceso aparte.
+
+```
+pwsh build/build-installer.ps1 -FfmpegDir <ruta>fmpeg-n8.1-latest-win64-gpl-8.1in -CertThumbprint <huella>
+```
 
 ## Firma y actualizaciones
 
 - Firmar con un certificado de firma de código (idealmente EV, para la reputación de SmartScreen). El script firma con SHA-256 y sello de tiempo.
+- **Certificado autofirmado** (gratis, para empezar): `pwsh build/new-selfsigned-cert.ps1` lo crea en el almacén del usuario (o reutiliza uno vigente), exporta `artifacts/AngelitoSystems-codesign.cer` e imprime la huella para `-CertThumbprint`. La firma prueba que el exe y el MSI no se alteraron, pero Windows solo confía en ella donde se importó el `.cer` en *Entidades de certificación raíz de confianza* y *Editores de confianza* (p. ej. TI por directiva de grupo). En cualquier otro PC `Get-AuthenticodeSignature` da `UnknownError` y SmartScreen sigue avisando de editor desconocido; eso solo lo quita un certificado de una CA pública. La clave privada no sale del equipo: **no se puede firmar desde el CI** con ella.
 - No hay actualización automática por red. El camino previsto: un manifiesto de versiones publicado por HTTPS con URL y SHA-256 del MSI; la app solo descargaría un MSI cuya firma Authenticode sea de Angelito Systems **y** cuyo hash coincida, y lo instalaría con `msiexec` (el mismo `UpgradeCode` hace el reemplazo). Canales previstos: `stable` y `beta` (dos manifiestos).
 - Herramienta: WiX 5.0.2 (licencia MS-RL, herramienta local en `dotnet-tools.json`). Las versiones 6+ añaden una cuota de mantenimiento para uso comercial.

@@ -47,7 +47,7 @@ public sealed class KeyFilter
 
     public KeyFilter(IEnumerable<string>? extraAllowed = null, IEnumerable<string>? extraExcludedApps = null)
     {
-        _allowed = new(DefaultAllowed.Concat(extraAllowed ?? []).Select(Normalize).Where(c => c != null)!, StringComparer.OrdinalIgnoreCase);
+        _allowed = new(DefaultAllowed.Concat(extraAllowed ?? []).Select(Normalize).Where(c => c != null && !TypesText(c))!, StringComparer.OrdinalIgnoreCase);
         _allowed.Remove(SuspendCombo);
         _excluded = new(DefaultExcludedApps.Concat(extraExcludedApps ?? []).Select(a => a.Trim().ToLowerInvariant()), StringComparer.OrdinalIgnoreCase);
     }
@@ -82,6 +82,18 @@ public sealed class KeyFilter
             m |= p.ToLowerInvariant() switch { "ctrl" or "control" => Mods.Ctrl, "alt" => Mods.Alt, "shift" => Mods.Shift, "win" or "windows" => Mods.Win, _ => Mods.AltGr };
         if (m.HasFlag(Mods.AltGr)) return null;
         return KnownKeys.TryGetValue(parts[^1], out var key) ? Format(m, key) : null;
+    }
+
+    /// <summary>
+    /// True for combos that can produce characters: a character key with no Ctrl/Alt/Win, or with Ctrl+Alt (= AltGr on many
+    /// layouts). Never allowed, whatever keys.json says.
+    /// </summary>
+    public static bool TypesText(string combo)
+    {
+        var p = combo.Split('+');
+        var mods = p[..^1];
+        var plain = !mods.Any(m => m is "Ctrl" or "Alt" or "Win") || mods.Contains("Ctrl") && mods.Contains("Alt");
+        return plain && (p[^1].Length == 1 || p[^1] is "Space" or "Plus" or "Minus" or "Period" or "Comma" or "Slash" or "Backtick");
     }
 
     private static readonly Dictionary<string, string> KnownKeys =
@@ -119,6 +131,18 @@ public sealed record KeySettings(List<string> ExtraAllowed, List<string> Exclude
         }
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { }
         return Empty;
+    }
+
+    public void Save(string path) => AtomicFile.WriteAllText(path, JsonSerializer.Serialize(this, SessionManifest.Json));
+
+    /// <summary>User-typed shortcuts → canonical allowed ones, plus the lines refused (not a shortcut, or one that types text).</summary>
+    public static (List<string> Ok, List<string> Rejected) ParseAllowed(IEnumerable<string> lines)
+    {
+        List<string> ok = [], bad = [];
+        foreach (var l in lines.Select(l => l.Trim()).Where(l => l.Length > 0))
+            if (KeyFilter.Normalize(l) is { } c && !KeyFilter.TypesText(c)) { if (!ok.Contains(c)) ok.Add(c); }
+            else bad.Add(l);
+        return (ok, bad);
     }
 
     private static KeySettings Empty => new([], []);

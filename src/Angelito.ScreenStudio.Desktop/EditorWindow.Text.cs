@@ -145,7 +145,11 @@ public partial class EditorWindow
 
     private void ApplyText(double t)
     {
-        foreach (var (s, e, el) in _textEls) el.Visibility = t >= s && t <= e ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var (s, e, el) in _textEls)
+        {
+            el.Visibility = t >= s && t <= e ? Visibility.Visible : Visibility.Collapsed;
+            el.Opacity = _playing ? Layout.FadeAlpha(t, s, e) : 1; // paused: full opacity so it can be edited at its first frame
+        }
     }
 
     private void DrawTextRows()

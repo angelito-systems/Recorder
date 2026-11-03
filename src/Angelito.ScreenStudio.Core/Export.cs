@@ -6,6 +6,13 @@ namespace Angelito.ScreenStudio.Core;
 /// <summary>Placement math shared by the editor preview and the exporter.</summary>
 public static class Layout
 {
+    /// <summary>Fade-in/out length for texts, subtitles and shortcuts; at most half of a short item.</summary>
+    public static double FadeLength(double start, double end) => Math.Min(0.2, (end - start) / 2);
+
+    /// <summary>Opacity at time t of an item shown from start to end (0 outside). Same curve as the export's alpha.</summary>
+    public static double FadeAlpha(double t, double start, double end) =>
+        t < start || t > end ? 0 : Math.Clamp(Math.Min(t - start, end - t) / Math.Max(1e-3, FadeLength(start, end)), 0, 1);
+
     public static (int W, int H) OutputSize(SessionManifest m, ExportSettings e, ProjectCanvas? canvas = null)
     {
         canvas ??= new ProjectCanvas();
@@ -42,7 +49,7 @@ public static class Exporter
 
     public static ExportPlan Build(StudioProject p, SessionManifest m, string sessionDir, IReadOnlyList<CursorEvent> cursor,
         EncoderChoice enc, string outPath, string graphPath, Func<int, (string Png, int X, int Y)?>? annotationImage = null,
-        IReadOnlyList<KeyEvent>? keys = null, Func<string, (string Png, int W, int H)?>? keyImage = null)
+        IReadOnlyList<KeyEvent>? keys = null, Func<string, (string Png, int W, int H)?>? keyImage = null, int vulkanDevice = -1)
     {
         if (p.Segments.Count == 0) throw new InvalidOperationException("No hay segmentos para exportar.");
         var (ow, oh) = Layout.OutputSize(m, p.Export, p.Canvas);
@@ -114,6 +121,13 @@ public static class Exporter
                 var (sx, sy, sw, sh) = ZoomMath.ViewRect(p.Zooms, 0, m.Width, m.Height, p.Canvas);
                 g.Append(F($"[{last}]crop={Math.Round(sw)}:{Math.Round(sh)}:{Math.Round(sx)}:{Math.Round(sy)}:exact=1,scale={ow}:{oh}:flags=bicubic,setsar=1[vz];\n"));
             }
+            else if (vulkanDevice >= 0)
+            {
+                // Same window on the GPU (libplacebo over Vulkan): equal speed on a discrete GPU, ~6× less CPU left to the encoder.
+                args.InsertRange(0, ["-init_hw_device", F($"vulkan=vk:{vulkanDevice}"), "-filter_hw_device", "vk"]);
+                var (vx, vy, vw, vh) = ZoomMath.FfmpegViewExpr(p.Zooms, p.Canvas, m.Width, m.Height, fps, "n");
+                g.Append($"[{last}]format=yuv420p,hwupload,libplacebo=w={ow}:h={oh}:crop_x='{vx}':crop_y='{vy}':crop_w='{vw}':crop_h='{vh}':format=yuv420p,hwdownload,format=yuv420p,setsar=1[vz];\n");
+            }
             else
             {
                 var (vx, vy, vw, vh) = ZoomMath.FfmpegViewExpr(p.Zooms, p.Canvas, m.Width, m.Height, fps);
@@ -149,6 +163,7 @@ public static class Exporter
                 var (r, gg, b) = ParseColor(color);
                 g.Append(F($"[{last}]drawtext=fontfile='{FilterPath(Font(bold))}':textfile='{FilterPath(file)}':expansion=none:text_align=C:fontsize={px}:fontcolor=0x{r:X2}{gg:X2}{b:X2}"));
                 if (box) g.Append(F($":box=1:boxcolor=black@0.55:boxborderw={TextPad(px)}"));
+                g.Append(F($":alpha='clip(min(t-{start:F3},{end:F3}-t)/{Math.Max(1e-3, Layout.FadeLength(start, end)):F3},0,1)'"));
                 g.Append(F($":x=({cx}*w-text_w/2):y=({cy}*h-text_h/2):enable='between(t,{start:F3},{end:F3})'[x{n}];\n"));
                 last = $"x{n++}";
             }
@@ -164,14 +179,17 @@ public static class Exporter
                 {
                     if (keyImage(group.Key) is not { } img) continue;
                     var shows = group.ToList();
-                    args.AddRange(["-i", img.Png]);
-                    g.Append(F($"[{input}:v]split={shows.Count}"));
+                    // Looped so each showing can fade; -t bounds the loop to the source length.
+                    args.AddRange(["-loop", "1", "-framerate", F($"{fps}"), "-t", F($"{srcEnd:F3}"), "-i", img.Png]);
+                    g.Append(F($"[{input}:v]format=rgba,split={shows.Count}"));
                     for (var i = 0; i < shows.Count; i++) g.Append($"[kq{kn + i}]");
                     g.Append(";\n");
                     int kx = (int)Math.Round(p.Keys.X * ow - img.W / 2.0), ky = (int)Math.Round(p.Keys.Y * oh - img.H / 2.0);
                     foreach (var (s, e, _) in shows)
                     {
-                        g.Append(F($"[{last}][kq{kn}]overlay={kx}:{ky}:enable='between(t,{s:F3},{e:F3})'[ko{kn}];\n"));
+                        var fd = Math.Max(1e-3, Layout.FadeLength(s, e));
+                        g.Append(F($"[kq{kn}]trim=start={s:F3}:end={e:F3},fade=t=in:st={s:F3}:d={fd:F3}:alpha=1,fade=t=out:st={e - fd:F3}:d={fd:F3}:alpha=1[kf{kn}];\n"));
+                        g.Append(F($"[{last}][kf{kn}]overlay={kx}:{ky}:eof_action=pass[ko{kn}];\n"));
                         last = $"ko{kn++}";
                     }
                     input++;
@@ -224,9 +242,18 @@ public static class Exporter
         for (var i = 0; i < k; i++) g.Append((video ? $"[k{i}]" : "") + (audioOut ? $"[ka{i}]" : ""));
         g.Append(F($"concat=n={k}:v={(video ? 1 : 0)}:a={(audioOut ? 1 : 0)}{(video ? "[vout]" : "")}{(audioOut ? "[aout]" : "")}"));
 
+        // Soft subtitle track (players can toggle it), in output time; added alongside any burned-in copy.
+        var srt = fmt is ExportFormat.Png or ExportFormat.Wav ? "" : p.ExportSrt();
+        if (srt.Length > 0)
+        {
+            var srtPath = Path.ChangeExtension(graphPath, ".subs.srt");
+            files[srtPath] = srt;
+            args.AddRange(["-i", srtPath]);
+        }
         args.AddRange(["-/filter_complex", graphPath]);
         if (video) args.AddRange(["-map", "[vout]"]);
         if (audioOut) args.AddRange(["-map", "[aout]"]);
+        if (srt.Length > 0) args.AddRange(["-map", $"{input}:s", "-c:s", fmt == ExportFormat.MkvH264 ? "srt" : "mov_text"]);
         switch (fmt)
         {
             case ExportFormat.Wav: args.AddRange(["-c:a", "pcm_s16le", outPath]); break;
@@ -255,6 +282,7 @@ public static class Exporter
         if (p.Export.Format == ExportFormat.Png) return (long)(w * h * 1.5);
         var bpp = p.Export.Quality switch { ExportQuality.Fast => 0.03, ExportQuality.High => 0.08, ExportQuality.Max => 0.12, _ => 0.05 };
         if (p.Export.Format == ExportFormat.Mp4Hevc) bpp *= 0.65;
+        if (p.Export.Format == ExportFormat.Mp4Av1) bpp *= 0.5;
         return (long)(dur * (bpp * w * h * Fps(p, m) + 192_000) / 8);
     }
 

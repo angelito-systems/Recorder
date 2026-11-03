@@ -40,7 +40,10 @@ public partial class AboutWindow : Window
             L("FFmpeg", ffmpeg);
             L("FFmpeg versión", await FirstLineAsync(ffmpeg, "-version"));
             L("Codificador export.", (await EncoderProbe.ForExportAsync()).Name);
-            L("Codificador HEVC", (await EncoderProbe.ForExportAsync(hevc: true)).Name);
+            L("Codificador HEVC", (await EncoderProbe.ForExportAsync(ExportFormat.Mp4Hevc)).Name);
+            L("Codificador AV1", (await EncoderProbe.ForExportAsync(ExportFormat.Mp4Av1)).Name);
+            L("Cámara (zoom)", await EncoderProbe.CameraGpuAsync() is var vk and >= 0 ? $"GPU, Vulkan {vk} (libplacebo)" : "CPU (perspective)");
+            L("Codificador AV1", (await EncoderProbe.ForExportAsync(ExportFormat.Mp4Av1)).Name);
         }
         catch (FileNotFoundException e) { L("FFmpeg", "NO ENCONTRADO — " + e.Message); }
 

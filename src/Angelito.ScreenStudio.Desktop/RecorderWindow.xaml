@@ -1,63 +1,196 @@
 <Window x:Class="Angelito.ScreenStudio.Desktop.RecorderWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Angelito Screen Studio Pro — Grabador" Width="420" SizeToContent="Height"
+        Title="Angelito Screen Studio Pro — Grabador" SizeToContent="WidthAndHeight"
         ResizeMode="CanMinimize" WindowStartupLocation="CenterScreen">
-    <StackPanel Margin="20">
-        <DockPanel>
-            <Button Content="Acerca de" DockPanel.Dock="Right" Click="OnAbout" Padding="10,2" VerticalAlignment="Center" ToolTip="Versión y diagnóstico"/>
-            <TextBlock Text="Nueva grabación" FontSize="20" FontWeight="SemiBold"/>
+    <Window.Resources>
+        <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+        <!-- One card per source: icon/preview on top, device picker under it. -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Width" Value="196"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Opacity" Value="0.7"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <!-- Source on/off: the big icon is the switch; off = dimmed with a slash. -->
+        <Style x:Key="SourceToggle" TargetType="ToggleButton">
+            <Setter Property="Height" Value="102"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bg" CornerRadius="6" Background="{DynamicResource SubtleFillColorSecondaryBrush}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Meter" TargetType="ProgressBar">
+            <Setter Property="Height" Value="5"/>
+            <Setter Property="Maximum" Value="1"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style x:Key="RecordButton" TargetType="Button">
+            <Setter Property="Width" Value="84"/>
+            <Setter Property="Height" Value="84"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform><ScaleTransform x:Name="Sc"/></Grid.RenderTransform>
+                            <Ellipse Stroke="{StaticResource Rec}" StrokeThickness="3" Opacity="0.55"/>
+                            <Ellipse x:Name="Dot" Margin="7" Fill="{StaticResource Rec}"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions><BeginStoryboard><Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleX" To="1.06" Duration="0:0:0.12"/>
+                                    <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleY" To="1.06" Duration="0:0:0.12"/>
+                                </Storyboard></BeginStoryboard></Trigger.EnterActions>
+                                <Trigger.ExitActions><BeginStoryboard><Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/>
+                                    <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/>
+                                </Storyboard></BeginStoryboard></Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Dot" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <StackPanel Margin="16">
+        <DockPanel Margin="0,0,0,12">
+            <Button Content="Acerca de" DockPanel.Dock="Right" Click="OnAbout" Padding="10,2" ToolTip="Versión y diagnóstico"/>
+            <Button x:Name="OpenBtn" Content="Abrir proyecto…" DockPanel.Dock="Right" Click="OnOpen" Padding="10,2" Margin="0,0,8,0"/>
+            <TextBlock Text="Nueva grabación" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
         </DockPanel>
-        <TextBlock x:Name="Status" Style="{StaticResource Hint}" Text="Detectando pantallas y codificadores…" Margin="0,4,0,0"/>
 
-        <TextBlock Style="{StaticResource Section}" Text="Pantalla"/>
-        <Grid>
-            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
-            <ComboBox x:Name="MonitorBox" ToolTip="Monitor a grabar"/>
-            <ComboBox x:Name="FpsBox" Grid.Column="1" Margin="8,0,0,0" SelectedIndex="2" ToolTip="Fotogramas por segundo">
-                <ComboBoxItem Content="24 FPS" Tag="24"/>
-                <ComboBoxItem Content="30 FPS" Tag="30"/>
-                <ComboBoxItem Content="60 FPS" Tag="60"/>
-            </ComboBox>
-        </Grid>
+        <StackPanel Orientation="Horizontal">
+            <!-- Area -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CardTitle}" Text="Área"/>
+                    <Border Height="102" CornerRadius="6" Background="{DynamicResource SubtleFillColorSecondaryBrush}">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE7F4;" FontSize="24" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="AreaText" Text="Pantalla completa" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Border>
+                    <ComboBox x:Name="WindowBox" Margin="0,8,0,0" DropDownOpened="OnWindowListOpen" SelectionChanged="OnWindowPick"
+                              ToolTip="Pantalla completa, una región o una sola ventana (aunque otras la tapen)"/>
+                    <DockPanel x:Name="AreaRow" Margin="0,6,0,0">
+                        <Button x:Name="RegionBtn" DockPanel.Dock="Right" Content="&#xE7A8;" FontFamily="{StaticResource Icons}" Click="OnRegion" Margin="6,0,0,0"
+                                ToolTip="Dibujar la región a grabar" AutomationProperties.Name="Seleccionar región"/>
+                        <Button x:Name="FullBtn" DockPanel.Dock="Right" Content="&#xE740;" FontFamily="{StaticResource Icons}" Click="OnFullScreen" Margin="6,0,0,0" Visibility="Collapsed"
+                                ToolTip="Volver a pantalla completa" AutomationProperties.Name="Pantalla completa"/>
+                        <ComboBox x:Name="MonitorBox" ToolTip="Monitor a grabar"/>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
 
-        <ComboBox x:Name="WindowBox" Margin="0,8,0,0" DropDownOpened="OnWindowListOpen" SelectionChanged="OnWindowPick"
-                  ToolTip="Graba solo esa ventana, aunque otras la tapen"/>
-        <DockPanel x:Name="AreaRow" Margin="0,8,0,0">
-            <Button x:Name="RegionBtn" DockPanel.Dock="Right" Content="Seleccionar región…" Click="OnRegion"/>
-            <Button x:Name="FullBtn" DockPanel.Dock="Right" Content="Completa" Click="OnFullScreen" Margin="0,0,6,0" Visibility="Collapsed"/>
-            <TextBlock x:Name="AreaText" VerticalAlignment="Center" Text="Pantalla completa"/>
-        </DockPanel>
+            <!-- Camera -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CardTitle}" Text="Cámara"/>
+                    <Border Height="102" CornerRadius="6" Background="{DynamicResource SubtleFillColorSecondaryBrush}" ClipToBounds="True">
+                        <Grid>
+                            <TextBlock x:Name="CamOff" FontFamily="{StaticResource Icons}" Text="&#xE714;" FontSize="24" Opacity="0.4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Image x:Name="CamImage" Stretch="UniformToFill"/>
+                        </Grid>
+                    </Border>
+                    <ComboBox x:Name="CamBox" Margin="0,8,0,0" SelectionChanged="OnCameraPick" ToolTip="Se graba como pista separada, editable después"/>
+                </StackPanel>
+            </Border>
 
-        <TextBlock Style="{StaticResource Section}" Text="Cámara"/>
-        <ComboBox x:Name="CamBox" ToolTip="Se graba como pista separada, editable después"/>
+            <!-- System audio -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CardTitle}" Text="Audio del sistema"/>
+                    <ToggleButton x:Name="SysBox" Style="{StaticResource SourceToggle}" IsChecked="True" ToolTip="Grabar lo que suena en el equipo (clic para activar/desactivar)">
+                        <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE767;" FontSize="26"/>
+                    </ToggleButton>
+                    <ProgressBar x:Name="SysMeter" Style="{StaticResource Meter}"/>
+                    <ComboBox x:Name="SpkDevBox" Margin="0,8,0,0" SelectionChanged="OnAudioPick" ToolTip="Salida de audio a grabar"/>
+                </StackPanel>
+            </Border>
 
-        <TextBlock Style="{StaticResource Section}" Text="Audio"/>
-        <Grid>
-            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions>
-            <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-            <CheckBox x:Name="MicBox" Content="Micrófono" IsChecked="True"/>
-            <ProgressBar x:Name="MicMeter" Grid.Column="1" Height="6" Maximum="1" VerticalAlignment="Center"/>
-            <CheckBox x:Name="SysBox" Grid.Row="1" Content="Audio del sistema" IsChecked="True" Margin="0,6,0,0"/>
-            <ProgressBar x:Name="SysMeter" Grid.Row="1" Grid.Column="1" Height="6" Maximum="1" VerticalAlignment="Center"/>
-        </Grid>
-        <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0"
-                   Text="Se registran la posición y los clics del ratón para editar zoom y efectos después."/>
-        <CheckBox x:Name="KeysBox" Content="Mostrar atajos de teclado" Margin="0,10,0,0"/>
-        <TextBlock Style="{StaticResource Hint}" Margin="22,2,0,0"
-                   Text="Solo se guardan combinaciones de una lista permitida (Ctrl+S, Alt+Tab…). Nunca texto escrito ni contraseñas; se ignoran los gestores de contraseñas. Ctrl+Mayús+F12 suspende o reanuda al instante."/>
+            <!-- Microphone -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CardTitle}" Text="Micrófono"/>
+                    <ToggleButton x:Name="MicBox" Style="{StaticResource SourceToggle}" IsChecked="True" ToolTip="Grabar el micrófono (clic para activar/desactivar)">
+                        <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE720;" FontSize="26"/>
+                    </ToggleButton>
+                    <ProgressBar x:Name="MicMeter" Style="{StaticResource Meter}"/>
+                    <ComboBox x:Name="MicDevBox" Margin="0,8,0,0" SelectionChanged="OnAudioPick" ToolTip="Micrófono a grabar"/>
+                </StackPanel>
+            </Border>
 
-        <Grid Margin="0,20,0,0">
-            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <Button x:Name="PauseBtn" Grid.Column="1" Margin="8,0,0,0" Padding="14,0" Content="❚❚ Pausar" Click="OnPause" Visibility="Collapsed"
-                    ToolTip="Ctrl+Mayús+F9 · Mientras está en pausa no se captura pantalla, cámara, cursor ni audio"/>
-            <Button x:Name="RecordBtn" Height="44" FontSize="15" Click="OnRecord" IsEnabled="False" ToolTip="Ctrl+Mayús+F10"
-                    Background="{StaticResource Rec}" Foreground="White" Content="● Grabar"/>
-            <Button x:Name="OpenBtn" Grid.Column="2" Margin="8,0,0,0" Padding="12,0" Content="Abrir proyecto…" Click="OnOpen"/>
-        </Grid>
-        <TextBlock x:Name="Timer" HorizontalAlignment="Center" FontSize="28" FontFamily="Cascadia Mono, Consolas"
-                   Margin="0,12,0,0" Visibility="Collapsed" Text="00:00:00"/>
-        <TextBlock Style="{StaticResource Hint}" HorizontalAlignment="Center" Margin="0,6,0,0"
-                   Text="Esta ventana no aparece en la grabación."/>
+            <!-- Record -->
+            <StackPanel Width="120" VerticalAlignment="Center">
+                <Grid Width="84" Height="84">
+                    <Ellipse x:Name="Pulse" Stroke="{StaticResource Rec}" StrokeThickness="2" Opacity="0" RenderTransformOrigin="0.5,0.5" IsHitTestVisible="False">
+                        <Ellipse.RenderTransform><ScaleTransform x:Name="PulseScale"/></Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Button x:Name="RecordBtn" Style="{StaticResource RecordButton}" Click="OnRecord" IsEnabled="False" Content="Grabar"
+                            ToolTip="Grabar / detener (Ctrl+Mayús+F10). Cuenta atrás de 3 s; Esc la cancela."/>
+                </Grid>
+                <TextBlock x:Name="Timer" HorizontalAlignment="Center" FontSize="18" FontFamily="Cascadia Mono, Consolas" Margin="0,8,0,0" Visibility="Collapsed" Text="00:00:00"/>
+                <Button x:Name="PauseBtn" Margin="0,6,0,0" HorizontalAlignment="Center" Padding="10,2" Content="❚❚ Pausar" Click="OnPause" Visibility="Collapsed"
+                        ToolTip="Ctrl+Mayús+F9 · Mientras está en pausa no se captura pantalla, cámara, cursor ni audio"/>
+            </StackPanel>
+        </StackPanel>
+
+        <Expander Header="Ajustes" Margin="0,12,0,0">
+            <StackPanel Margin="4,8,0,0">
+                <DockPanel>
+                    <TextBlock Text="Fotogramas por segundo" VerticalAlignment="Center" Width="170"/>
+                    <ComboBox x:Name="FpsBox" Width="110" HorizontalAlignment="Left" SelectedIndex="2" ToolTip="Fotogramas por segundo">
+                        <ComboBoxItem Content="24 FPS" Tag="24"/>
+                        <ComboBoxItem Content="30 FPS" Tag="30"/>
+                        <ComboBoxItem Content="60 FPS" Tag="60"/>
+                    </ComboBox>
+                </DockPanel>
+                <DockPanel Margin="0,10,0,0">
+                    <Button DockPanel.Dock="Right" Content="Editar lista…" Click="OnEditKeys" Padding="8,0"/>
+                    <CheckBox x:Name="KeysBox" Content="Mostrar atajos de teclado" VerticalAlignment="Center"/>
+                </DockPanel>
+                <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0" MaxWidth="760" HorizontalAlignment="Left"
+                           Text="Solo se guardan combinaciones de una lista permitida (Ctrl+S, Alt+Tab…). Nunca texto escrito ni contraseñas; se ignoran los gestores de contraseñas. Ctrl+Mayús+F12 suspende o reanuda al instante."/>
+                <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0"
+                           Text="Se registran la posición y los clics del ratón para editar zoom y efectos después. Esta ventana no aparece en la grabación."/>
+            </StackPanel>
+        </Expander>
+        <TextBlock x:Name="Status" Style="{StaticResource Hint}" Text="Detectando pantallas y codificadores…" Margin="0,10,0,0" MaxWidth="900" HorizontalAlignment="Left"/>
     </StackPanel>
 </Window>

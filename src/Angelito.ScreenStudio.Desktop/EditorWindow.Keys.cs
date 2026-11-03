@@ -54,9 +54,14 @@ public partial class EditorWindow
     private void ApplyKeys(double t)
     {
         string? current = null;
-        foreach (var w in _keyWindows) if (t >= w.Start && t <= w.End) { current = w.Combo; break; }
+        var alpha = 1.0;
+        foreach (var w in _keyWindows) if (t >= w.Start && t <= w.End) { current = w.Combo; alpha = Layout.FadeAlpha(t, w.Start, w.End); break; }
         foreach (var (combo, el) in _keyEls)
-            el.Visibility = combo == current || (_keyDrag?.El == el) ? Visibility.Visible : Visibility.Collapsed;
+        {
+            var dragged = _keyDrag?.El == el;
+            el.Visibility = combo == current || dragged ? Visibility.Visible : Visibility.Collapsed;
+            el.Opacity = dragged || !_playing ? 1 : alpha;
+        }
     }
 
     private void DragKey(MouseEventArgs e)

@@ -1,0 +1,25 @@
+<Window x:Class="Angelito.ScreenStudio.Desktop.KeysWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Atajos de teclado" Width="620" Height="560" MinWidth="460" MinHeight="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="20">
+        <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}" TextWrapping="Wrap"
+                   Text="Solo se muestran los atajos de la lista. Nunca se aceptan combinaciones que escriben texto (letras, Mayús+letra, Ctrl+Alt+letra) aunque las añadas aquí."/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Cancelar" IsCancel="True" Padding="14,4"/>
+            <Button Content="Guardar" Click="OnSave" IsDefault="True" Margin="8,0,0,0" Padding="14,4" Style="{StaticResource AccentButton}"/>
+        </StackPanel>
+        <Grid Margin="0,12,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+            <Label Content="_Atajos adicionales (uno por línea, p. ej. Ctrl+Shift+L)" Target="{Binding ElementName=AllowedBox}" Padding="0,0,0,4"/>
+            <TextBox x:Name="AllowedBox" Grid.Row="1" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontFamily="Cascadia Mono, Consolas"/>
+            <Label Grid.Row="2" Content="_Programas excluidos (nombre del proceso, p. ej. keepass)" Target="{Binding ElementName=AppsBox}" Padding="0,10,0,4"/>
+            <TextBox x:Name="AppsBox" Grid.Row="3" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontFamily="Cascadia Mono, Consolas"/>
+            <Label Grid.Column="2" Content="Incluidos siempre" Padding="0,0,0,4"/>
+            <TextBox x:Name="DefaultsBox" Grid.Column="2" Grid.Row="1" Grid.RowSpan="3" IsReadOnly="True" VerticalScrollBarVisibility="Auto"
+                     TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas" Opacity="0.8"/>
+        </Grid>
+    </DockPanel>
+</Window>

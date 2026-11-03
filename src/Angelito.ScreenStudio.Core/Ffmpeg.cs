@@ -129,6 +129,11 @@ public sealed record EncoderChoice(string Name, string CaptureFilter, bool Hardw
             "h264_nvenc" or "hevc_nvenc" => ["-c:v", Name, "-preset", new[] { "p2", "p4", "p6", "p7" }[i], "-rc", "vbr", "-cq", cq, "-b:v", "0"],
             "h264_qsv" or "hevc_qsv" => ["-c:v", Name, "-preset", new[] { "veryfast", "medium", "slower", "veryslow" }[i], "-global_quality", cq],
             "h264_amf" or "hevc_amf" => ["-c:v", Name, "-quality", new[] { "speed", "balanced", "quality", "quality" }[i], "-rc", "cqp", "-qp_i", cq, "-qp_p", cq],
+            "av1_nvenc" => ["-c:v", Name, "-preset", new[] { "p2", "p4", "p6", "p7" }[i], "-rc", "vbr", "-cq", new[] { "36", "30", "26", "22" }[i], "-b:v", "0"],
+            "av1_qsv" => ["-c:v", Name, "-preset", new[] { "veryfast", "medium", "slower", "veryslow" }[i], "-global_quality", cq],
+            "av1_amf" => ["-c:v", Name, "-quality", new[] { "speed", "balanced", "quality", "quality" }[i], "-rc", "cqp", "-qp_i", cq, "-qp_p", cq],
+            // CPU AV1 is slow even at the fastest settings; it's the last resort when no GPU can encode AV1.
+            "libaom-av1" => ["-c:v", Name, "-cpu-used", new[] { "8", "7", "6", "5" }[i], "-row-mt", "1", "-crf", new[] { "40", "34", "30", "26" }[i], "-b:v", "0"],
             "libx265" => ["-c:v", Name, "-preset", new[] { "veryfast", "medium", "slow", "slower" }[i], "-crf", cq],
             _ => ["-c:v", "libx264", "-preset", new[] { "veryfast", "medium", "slow", "slower" }[i], "-crf", cq],
         };
@@ -174,15 +179,44 @@ public static class EncoderProbe
         return Cpu;
     }
 
-    public static async Task<EncoderChoice> ForExportAsync(bool hevc = false)
+    public static readonly EncoderChoice CpuAv1 = new("libaom-av1", "", false);
+
+    /// <summary>Best working encoder for a video export format (H.264 for non-video formats).</summary>
+    public static async Task<EncoderChoice> ForExportAsync(ExportFormat format = ExportFormat.Mp4H264)
     {
-        foreach (var name in hevc ? new[] { "hevc_nvenc", "hevc_qsv", "hevc_amf" } : new[] { "h264_nvenc", "h264_qsv", "h264_amf" })
+        var codec = format switch { ExportFormat.Mp4Hevc => "hevc", ExportFormat.Mp4Av1 => "av1", _ => "h264" };
+        foreach (var name in new[] { "nvenc", "qsv", "amf" }.Select(hw => $"{codec}_{hw}"))
         {
             var c = new EncoderChoice(name, "", true);
             if (await Works(["-loglevel", "error", "-f", "lavfi", "-i", "color=s=640x360:d=0.2", "-pix_fmt", c.CpuPixFmt, .. c.QualityArgs(ExportQuality.Fast), "-f", "null", "-"]))
                 return c;
         }
-        return hevc ? CpuHevc : Cpu;
+        return codec switch { "hevc" => CpuHevc, "av1" => CpuAv1, _ => Cpu };
+    }
+
+    /// <summary>
+    /// Vulkan device for the zoom camera (libplacebo), or -1 for the CPU path. Each device runs the same animated 1080p crop;
+    /// the fastest wins, and only if it isn't slower than the CPU (an integrated GPU can be 4× slower than perspective).
+    /// </summary>
+    public static async Task<int> CameraGpuAsync()
+    {
+        const string Src = "testsrc2=s=1920x1080:r=60:d=1.5", X = "(100+200*n/60)";
+        var cpu = await Timed(["-f", "lavfi", "-i", Src, "-vf", $"format=yuv420p,perspective=x0='{X}':y0=50:x1='{X}+1280':y1=50:x2='{X}':y2=770:x3='{X}+1280':y3=770:eval=frame:sense=source,scale=1920:1080:flags=bicubic", "-f", "null", "-"]);
+        var (best, bestTime) = (-1, cpu * 1.1);
+        for (var d = 0; d < 4; d++)
+        {
+            var gpu = await Timed(["-init_hw_device", $"vulkan=vk:{d}", "-filter_hw_device", "vk", "-f", "lavfi", "-i", Src,
+                "-vf", $"format=yuv420p,hwupload,libplacebo=w=1920:h=1080:crop_x='{X}':crop_y=50:crop_w=1280:crop_h=720:format=yuv420p,hwdownload,format=yuv420p", "-f", "null", "-"]);
+            if (gpu < bestTime) (best, bestTime) = (d, gpu);
+        }
+        return best;
+    }
+
+    /// <summary>Wall time of an ffmpeg run, or +∞ if it fails (no such device, no libplacebo…).</summary>
+    private static async Task<double> Timed(IEnumerable<string> args)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        return await Works(["-loglevel", "error", .. args]) ? sw.Elapsed.TotalSeconds : double.PositiveInfinity;
     }
 
     private static async Task<bool> Works(IEnumerable<string> args)
@@ -197,7 +231,7 @@ public static class EncoderProbe
 /// A Windows job object with kill-on-close: every ffmpeg we start is assigned to it, so if this app crashes or is killed,
 /// the OS ends the children too instead of leaving a capture running forever. Partial MKVs stay recoverable.
 /// </summary>
-internal static class ChildProcessJob
+public static class ChildProcessJob
 {
     private static readonly IntPtr Job = Create();
 

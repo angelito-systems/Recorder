@@ -56,7 +56,8 @@ public sealed class RenderJob : INotifyPropertyChanged
 public static class RenderQueue
 {
     public static ObservableCollection<RenderJob> Jobs { get; } = [];
-    private static readonly Dictionary<bool, Task<EncoderChoice>> s_encoders = [];
+    private static readonly Dictionary<ExportFormat, Task<EncoderChoice>> s_encoders = [];
+    private static Task<int>? s_cameraGpu;
     private static bool s_running;
 
     public static bool Busy => Jobs.Any(j => j.IsActive);
@@ -90,16 +91,24 @@ public static class RenderQueue
         var part = Path.Combine(Path.GetDirectoryName(job.OutputPath)!, Path.GetFileNameWithoutExtension(job.OutputPath) + ".part" + Path.GetExtension(job.OutputPath));
         try
         {
-            var hevc = job.Project.Export.Format == ExportFormat.Mp4Hevc;
-            if (!s_encoders.TryGetValue(hevc, out var probe)) s_encoders[hevc] = probe = EncoderProbe.ForExportAsync(hevc);
+            var fmt = job.Project.Export.Format;
+            if (!s_encoders.TryGetValue(fmt, out var probe)) s_encoders[fmt] = probe = EncoderProbe.ForExportAsync(fmt);
             var enc = await probe;
             job.Encoder = job.Project.Export.Format switch { ExportFormat.Wav => "PCM", ExportFormat.Png => "PNG", _ => enc.Name };
             var graph = Path.Combine(job.TempDir, "export.graph");
-            var plan = Exporter.Build(job.Project, job.Manifest, job.SessionDir, job.Cursor, enc, part, graph,
+            var gpu = job.Project.Zooms.Count > 0 && fmt is not (ExportFormat.Wav or ExportFormat.Png) ? await (s_cameraGpu ??= EncoderProbe.CameraGpuAsync()) : -1;
+            ExportPlan Plan(int vk) => Exporter.Build(job.Project, job.Manifest, job.SessionDir, job.Cursor, enc, part, graph,
                 i => job.AnnotationImages.TryGetValue(i, out var v) ? v : null,
-                job.Keys, c => job.KeyImages.TryGetValue(c, out var k) ? k : null);
+                job.Keys, c => job.KeyImages.TryGetValue(c, out var k) ? k : null, vk);
             var ui = Application.Current.Dispatcher;
-            await Exporter.RunAsync(plan, graph, v => ui.BeginInvoke(() => job.Progress = v), job.Cts.Token);
+            try { await Exporter.RunAsync(Plan(gpu), graph, v => ui.BeginInvoke(() => job.Progress = v), job.Cts.Token); }
+            catch (Exception ex) when (gpu >= 0 && !job.Cts.IsCancellationRequested)
+            {
+                // A GPU path that passed the probe can still fail on a driver quirk; the CPU path always works.
+                App.Log($"GPU camera failed, retrying on CPU: {ex.Message}");
+                s_cameraGpu = Task.FromResult(-1);
+                await Exporter.RunAsync(Plan(-1), graph, v => ui.BeginInvoke(() => job.Progress = v), job.Cts.Token);
+            }
             File.Move(part, job.OutputPath, overwrite: true);
             job.Progress = 1;
             job.State = JobState.Done;

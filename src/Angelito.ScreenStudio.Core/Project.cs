@@ -9,8 +9,19 @@ public sealed record Segment(double Start, double End)
     [JsonIgnore] public double Duration => End - Start;
 }
 
-/// <summary>X/Y are the zoom center normalized to 0..1 of the source frame. Ramp is ease-in/out time in seconds.</summary>
-public sealed record ZoomSegment(double Start, double End, double Scale, double X, double Y, double Ramp = 0.6);
+/// <summary>
+/// X/Y are the zoom center normalized to 0..1 of the source frame. Ramp is the ease-in time in seconds; RampOut the
+/// ease-out time (negative = same as Ramp, which is how projects saved before it existed read). Auto marks zooms made
+/// by <see cref="AutoZoom"/>, so regenerating replaces only those and keeps the user's own.
+/// </summary>
+public sealed record ZoomSegment(double Start, double End, double Scale, double X, double Y, double Ramp = 0.6, double RampOut = -1, bool Auto = false);
+
+/// <summary>
+/// Auto-zoom tuning (Efectos → Zoom). Times in seconds. IdleReturn: inactivity after the last click before zooming
+/// back out. Follow: a click elsewhere while zoomed pans there instead of zooming out and in again.
+/// </summary>
+public sealed record AutoZoomSettings(bool Enabled = true, double Scale = 1.5, double ZoomIn = 0.45, double MinHold = 1.2,
+    double IdleReturn = 2.0, double ZoomOut = 0.6, bool Follow = true);
 
 public sealed record CursorStyle(bool ShowClicks = true, string Color = "#8B5CF6", int Size = 56, double Duration = 0.5);
 
@@ -82,7 +93,7 @@ public sealed record KeystrokeStyle(bool Visible = true, KeyLook Look = KeyLook.
 
 public enum ExportQuality { Fast, Balanced, High, Max }
 
-public enum ExportFormat { Mp4H264, Mp4Hevc, MkvH264, Wav, Png }
+public enum ExportFormat { Mp4H264, Mp4Hevc, MkvH264, Wav, Png, Mp4Av1 }
 
 /// <summary>Height is the short side of the output in pixels; 0 keeps the canvas window's own pixel size.</summary>
 /// <summary>Fps 0 keeps the recording's rate.</summary>
@@ -101,6 +112,7 @@ public sealed record StudioProject
     public string SessionDir { get; init; } = ".";
     public List<Segment> Segments { get; init; } = [];
     public List<ZoomSegment> Zooms { get; init; } = [];
+    public AutoZoomSettings AutoZoom { get; init; } = new();
     public CursorStyle Cursor { get; init; } = new();
     public WebcamLayout Webcam { get; init; } = new();
     public AudioMix Audio { get; init; } = new();
@@ -114,7 +126,7 @@ public sealed record StudioProject
     public static StudioProject FromSession(double duration, IReadOnlyList<CursorEvent> cursor, int width, int height) => new()
     {
         Segments = [new Segment(0, duration)],
-        Zooms = AutoZoom.Propose(cursor, width, height, duration),
+        Zooms = Core.AutoZoom.Propose(cursor, width, height, duration),
     };
 
     public string ToJson() => JsonSerializer.Serialize(this, SessionManifest.Json);
@@ -170,9 +182,52 @@ public sealed record StudioProject
     /// <summary>The output-time span of a source range, trimmed to what survives the cuts; null if fully removed.</summary>
     public (double Start, double End)? OutputRange(double a, double b)
     {
-        var kept = Segments.Select(s => (S: Math.Max(s.Start, a), E: Math.Min(s.End, b))).Where(r => r.E > r.S).ToList();
-        if (kept.Count == 0) return null;
-        return (ToOutput(kept[0].S)!.Value, ToOutput(kept[^1].E)!.Value);
+        // Pieces in output order; consecutive ones join. With reordered clips a range can split apart: the first run wins.
+        // Mapped per clip: a boundary instant belongs to two clips, so ToOutput would be ambiguous here.
+        var pieces = new List<(double S, double E)>();
+        double acc = 0;
+        foreach (var s in Segments)
+        {
+            double ps = Math.Max(s.Start, a), pe = Math.Min(s.End, b);
+            if (pe > ps) pieces.Add((acc + ps - s.Start, acc + pe - s.Start));
+            acc += s.Duration;
+        }
+        pieces.Sort();
+        if (pieces.Count == 0) return null;
+        var run = pieces[0];
+        foreach (var r in pieces.Skip(1))
+            if (r.S - run.E < 1e-6) run.E = Math.Max(run.E, r.E); else break;
+        return run;
+    }
+
+    /// <summary>Moves the clip containing source time t one place earlier (dir -1) or later (+1) in the output.</summary>
+    public StudioProject MoveSegment(double t, int dir)
+    {
+        var i = Segments.FindIndex(s => t >= s.Start && t < s.End);
+        var j = i + Math.Sign(dir);
+        if (i < 0 || j < 0 || j >= Segments.Count) return this;
+        var list = new List<Segment>(Segments);
+        (list[i], list[j]) = (list[j], list[i]);
+        return this with { Segments = list };
+    }
+
+    /// <summary>
+    /// Playback in output order: the clip index to play at source time t, given the one playing (-1 if none).
+    /// Running off the end of the current clip continues with the next in the list; -1 means the end.
+    /// </summary>
+    public int PlaybackSegment(int current, double t)
+    {
+        if (current >= 0 && current < Segments.Count)
+        {
+            var c = Segments[current];
+            if (t >= c.Start - 0.05 && t < c.End) return current;
+            if (t >= c.End && t < c.End + 0.5) return current + 1 < Segments.Count ? current + 1 : -1; // natural run-off
+        }
+        var inside = Segments.FindIndex(s => t >= s.Start - 0.02 && t < s.End);
+        if (inside >= 0) return inside;
+        // In a removed range (e.g. after a seek): the next kept source range, else the end.
+        var next = Segments.Select((s, k) => (s, k)).Where(x => x.s.Start > t).OrderBy(x => x.s.Start).FirstOrDefault();
+        return next.s == null ? -1 : next.k;
     }
 
     /// <summary>SRT in output time, i.e. aligned with the exported video. Cues inside removed ranges are dropped.</summary>
