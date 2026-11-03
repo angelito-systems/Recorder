@@ -85,7 +85,7 @@ public partial class EditorWindow
     {
         text = text.Replace("\r\n", "\n").Trim();
         if (text.Length == 0) return;
-        var px = Math.Max(8, Math.Round(size * _m.Height));
+        var px = Math.Max(8, Math.Round(size * Math.Min(SW, SH)));
         var el = new Border
         {
             Padding = new Thickness(Exporter.TextPad((int)px)),
@@ -101,8 +101,8 @@ public partial class EditorWindow
             },
         };
         el.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Canvas.SetLeft(el, cx * _m.Width - el.DesiredSize.Width / 2);
-        Canvas.SetTop(el, cy * _m.Height - el.DesiredSize.Height / 2);
+        Canvas.SetLeft(el, cx * SW - el.DesiredSize.Width / 2);
+        Canvas.SetTop(el, cy * SH - el.DesiredSize.Height / 2);
         el.MouseLeftButtonDown += (_, e) =>
         {
             // Refresh is deferred to mouse-up: it rebuilds the layer and would drop the captured element.
@@ -122,11 +122,11 @@ public partial class EditorWindow
     {
         if (_textDrag is not { } d || !d.El.IsMouseCaptured) return;
         var p = e.GetPosition(Stage);
-        double cx = (p.X - d.Grab.X + d.El.ActualWidth / 2) / _m.Width, cy = (p.Y - d.Grab.Y + d.El.ActualHeight / 2) / _m.Height;
+        double cx = (p.X - d.Grab.X + d.El.ActualWidth / 2) / SW, cy = (p.Y - d.Grab.Y + d.El.ActualHeight / 2) / SH;
         cx = Math.Round(Math.Clamp(cx, 0, 1), 4);
         cy = Math.Round(Math.Clamp(cy, 0, 1), 4);
-        Canvas.SetLeft(d.El, cx * _m.Width - d.El.ActualWidth / 2);
-        Canvas.SetTop(d.El, cy * _m.Height - d.El.ActualHeight / 2);
+        Canvas.SetLeft(d.El, cx * SW - d.El.ActualWidth / 2);
+        Canvas.SetTop(d.El, cy * SH - d.El.ActualHeight / 2);
         _textDragPos = (cx, cy);
     }
 

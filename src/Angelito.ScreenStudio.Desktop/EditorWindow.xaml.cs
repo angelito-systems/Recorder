@@ -51,8 +51,8 @@ public partial class EditorWindow : Window
         _clicks = _cursor.Where(c => c.K != CursorKind.Move).ToList();
         _duration = Math.Max(P.Segments.Max(s => s.End), 0.1);
         _view = TimelineView.Fit(_duration);
-        Stage.Width = ZoomHost.Width = ScreenMedia.Width = _m.Width;
-        Stage.Height = ZoomHost.Height = ScreenMedia.Height = _m.Height;
+        ZoomHost.Width = ScreenMedia.Width = _m.Width;
+        ZoomHost.Height = ScreenMedia.Height = _m.Height;
 
         Open(ScreenMedia, _m.Screen);
         Open(CamMedia, _m.Webcam);
@@ -71,6 +71,7 @@ public partial class EditorWindow : Window
             Seek(P.Segments[0].Start);
             DrawTimeline();
         };
+        CamMedia.MediaOpened += (_, _) => LayoutCam(); // real video aspect is known only now
         ScreenMedia.MediaFailed += (_, e) => MessageBox.Show(this, "No se pudo reproducir el video de pantalla: " + e.ErrorException.Message, App.Product);
         ScreenMedia.MediaEnded += (_, _) => Pause();
 
@@ -125,6 +126,7 @@ public partial class EditorWindow : Window
     {
         _refreshing = true;
         var p = P;
+        RefreshCanvas();
         if (_selectedZoom >= p.Zooms.Count) _selectedZoom = -1;
         ZoomPanel.IsEnabled = DelZoomBtn.IsEnabled = _selectedZoom >= 0;
         if (_selectedZoom >= 0)
@@ -161,7 +163,7 @@ public partial class EditorWindow : Window
 
         ExportHeight.SelectedIndex = Math.Max(0, ExportHeight.Items.Cast<ComboBoxItem>().ToList().FindIndex(i => (string)i.Tag == p.Export.Height.ToString()));
         ExportQualityBox.SelectedIndex = (int)p.Export.Quality;
-        var (ow, oh) = Layout.OutputSize(_m, p.Export);
+        var (ow, oh) = Layout.OutputSize(_m, p.Export, p.Canvas);
         ExportInfo.Text = $"{ow}×{oh} · {_m.Fps} FPS · duración {Fmt(p.OutputDuration)} · H.264/AAC";
 
         UndoBtn.IsEnabled = _history.CanUndo;
@@ -176,12 +178,19 @@ public partial class EditorWindow : Window
 
     private void LayoutCam()
     {
-        var (x, y, d) = Layout.WebcamRect(_m.Width, _m.Height, P.Webcam);
+        var (x, y, d) = Layout.WebcamRect((int)SW, (int)SH, P.Webcam);
         var r = Layout.CornerRadius(P.Webcam.Shape, d);
         CamFrame.Margin = new Thickness(x, y, 0, 0);
-        CamFrame.Width = CamFrame.Height = CamMedia.Width = CamMedia.Height = d;
+        CamFrame.Width = CamFrame.Height = d;
         CamFrame.Clip = new RectangleGeometry(new Rect(0, 0, d, d), r, r);
-        CamMedia.RenderTransform = new ScaleTransform(P.Webcam.Mirror ? -1 : 1, 1);
+        // Center-crop like the exporter (scale to cover, crop the middle), with explicit sizes: Stretch=UniformToFill plus a
+        // mirror transform drew the video shifted by half its overflow.
+        var aspect = CamMedia.NaturalVideoHeight > 0 ? CamMedia.NaturalVideoWidth / (double)CamMedia.NaturalVideoHeight : 16 / 9.0;
+        double mw = aspect >= 1 ? d * aspect : d, mh = aspect >= 1 ? d : d / aspect;
+        CamMedia.Width = mw;
+        CamMedia.Height = mh;
+        CamMedia.Margin = new Thickness((d - mw) / 2, (d - mh) / 2, 0, 0);
+        CamMedia.RenderTransform = new ScaleTransform(P.Webcam.Mirror ? -1 : 1, 1, mw / 2, 0);
         CamFrame.Opacity = P.Webcam.Visible ? 1 : 0.25; // faded, not hidden, so it can still be re-enabled and dragged
     }
 
@@ -209,8 +218,8 @@ public partial class EditorWindow : Window
     private void ApplyVisuals(double t)
     {
         if (_m == null) return;
-        var (vx, vy, vw, _) = ZoomMath.ViewRect(P.Zooms, t, _m.Width, _m.Height);
-        var s = _m.Width / vw;
+        var (vx, vy, vw, _) = ZoomMath.ViewRect(P.Zooms, t, _m.Width, _m.Height, P.Canvas);
+        var s = SW / vw; // stage = canvas window in source-pixel units
         ZoomTransform.Matrix = new Matrix(s, 0, 0, s, -vx * s, -vy * s);
 
         var active = P.Cursor.ShowClicks ? _clicks.Where(c => t >= c.T && t <= c.T + P.Cursor.Duration).ToList() : [];
@@ -436,7 +445,8 @@ public partial class EditorWindow : Window
 
     private void OnStageClick(object sender, MouseButtonEventArgs e)
     {
-        if (_selectedZoom < 0 || e.Source == CamMedia) return;
+        if (e.Source == CamMedia) return;
+        if (_selectedZoom < 0) { BeginFraming(e); return; }
         var p = e.GetPosition(ZoomHost); // source pixels, accounting for the current zoom transform
         EditZoom(z => z with { X = Math.Round(Math.Clamp(p.X / _m.Width, 0, 1), 4), Y = Math.Round(Math.Clamp(p.Y / _m.Height, 0, 1), 4) }, "center" + Guid.NewGuid());
     }
@@ -485,7 +495,7 @@ public partial class EditorWindow : Window
         if (!_camDragging) return;
         var p = e.GetPosition(Stage);
         var d = CamFrame.Width;
-        Commit(P with { Webcam = P.Webcam with { X = Math.Round((p.X - _camGrab.X + d / 2) / _m.Width, 4), Y = Math.Round((p.Y - _camGrab.Y + d / 2) / _m.Height, 4) } }, "camdrag");
+        Commit(P with { Webcam = P.Webcam with { X = Math.Round((p.X - _camGrab.X + d / 2) / SW, 4), Y = Math.Round((p.Y - _camGrab.Y + d / 2) / SH, 4) } }, "camdrag");
     }
 
     private void OnCamUp(object sender, MouseButtonEventArgs e)

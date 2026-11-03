@@ -6,15 +6,23 @@ namespace Angelito.ScreenStudio.Core;
 /// <summary>Placement math shared by the editor preview and the exporter.</summary>
 public static class Layout
 {
-    public static (int W, int H) OutputSize(SessionManifest m, ExportSettings e)
+    public static (int W, int H) OutputSize(SessionManifest m, ExportSettings e, ProjectCanvas? canvas = null)
     {
-        if (e.Height <= 0 || e.Height >= m.Height) return (Even(m.Width), Even(m.Height));
-        return (Even(m.Width * (double)e.Height / m.Height), Even(e.Height));
+        canvas ??= new ProjectCanvas();
+        var (cw, ch) = canvas.Window(m.Width, m.Height);
+        var shortSide = Math.Min(cw, ch);
+        // Source shape never upscales (as before); social formats get the exact size asked for (e.g. 1080×1920).
+        if (e.Height <= 0 || (canvas.Aspect == CanvasAspect.Source && e.Height >= shortSide)) return (Even(cw), Even(ch));
+        var k = e.Height / shortSide;
+        return (Even(cw * k), Even(ch * k));
     }
+
+    /// <summary>Size unit for webcam and text: the output's short side, so a vertical frame isn't overfilled.</summary>
+    public static int Unit(int outW, int outH) => Math.Min(outW, outH);
 
     public static (int X, int Y, int D) WebcamRect(int outW, int outH, WebcamLayout l)
     {
-        var d = Math.Clamp(Even(l.Size * outH), 16, Even(Math.Min(outW, outH)));
+        var d = Math.Clamp(Even(l.Size * Unit(outW, outH)), 16, Even(Math.Min(outW, outH)));
         return ((int)Math.Clamp(l.X * outW - d / 2.0, 0, outW - d), (int)Math.Clamp(l.Y * outH - d / 2.0, 0, outH - d), d);
     }
 
@@ -27,7 +35,7 @@ public static class Layout
 public sealed record ExportPlan(List<string> Args, string FilterGraph, double Duration, Dictionary<string, string> Files);
 
 /// <summary>Turns a project into one ffmpeg invocation (single process, whole graph), mirroring the preview's layer order:
-/// screen → annotations → click rings → zoom → webcam → texts → cuts → encode.</summary>
+/// screen → annotations → click rings → camera (canvas + zoom) → webcam → texts → cuts → encode.</summary>
 public static class Exporter
 {
     private static string F(FormattableString s) => s.ToString(CultureInfo.InvariantCulture);
@@ -36,7 +44,7 @@ public static class Exporter
         EncoderChoice enc, string outPath, string graphPath, Func<int, (string Png, int X, int Y)?>? annotationImage = null)
     {
         if (p.Segments.Count == 0) throw new InvalidOperationException("No hay segmentos para exportar.");
-        var (ow, oh) = Layout.OutputSize(m, p.Export);
+        var (ow, oh) = Layout.OutputSize(m, p.Export, p.Canvas);
         int fps = Math.Clamp(m.Fps, 1, 240);
         var g = new StringBuilder();
         var args = new List<string> { "-y", "-loglevel", "error", "-progress", "pipe:1", "-nostats" };
@@ -93,9 +101,19 @@ public static class Exporter
             }
         }
 
-        // shortcut: zoompan crops on integer pixels, so slow zooms can shimmer slightly; upgrade to a GPU compositor in the optimization phase.
-        var (z, x, y) = ZoomMath.FfmpegZoomExpr(p.Zooms);
-        g.Append(F($"[{last}]zoompan=z='{z}':x='{x}':y='{y}':d=1:s={ow}x{oh}:fps={fps}[vz];\n"));
+        // Camera: canvas window moved by zooms → output size. perspective samples sub-pixel (no zoompan shimmer);
+        // without zooms the window is static and a plain crop is much cheaper.
+        if (p.Zooms.Count == 0)
+        {
+            var (sx, sy, sw, sh) = ZoomMath.ViewRect(p.Zooms, 0, m.Width, m.Height, p.Canvas);
+            g.Append(F($"[{last}]crop={Math.Round(sw)}:{Math.Round(sh)}:{Math.Round(sx)}:{Math.Round(sy)}:exact=1,scale={ow}:{oh}:flags=bicubic,setsar=1[vz];\n"));
+        }
+        else
+        {
+            var (vx, vy, vw, vh) = ZoomMath.FfmpegViewExpr(p.Zooms, p.Canvas, m.Width, m.Height, fps);
+            g.Append($"[{last}]perspective=x0='{vx}':y0='{vy}':x1='{vx}+{vw}':y1='{vy}':x2='{vx}':y2='{vy}+{vh}':x3='{vx}+{vw}':y3='{vy}+{vh}':eval=frame:sense=source,");
+            g.Append(F($"scale={ow}:{oh}:flags=bicubic,setsar=1[vz];\n"));
+        }
         last = "vz";
 
         if (m.Webcam != null && p.Webcam.Visible && File.Exists(Path.Combine(sessionDir, m.Webcam)))
@@ -122,7 +140,7 @@ public static class Exporter
             var file = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(graphPath)}.text{n}.txt");
             // shortcut: FFmpeg 8 drawtext draws a missing-glyph box for LF but breaks cleanly on CR; re-check when upgrading FFmpeg.
             files[file] = text.Replace('\n', '\r');
-            var px = Math.Max(8, (int)Math.Round(size * oh));
+            var px = Math.Max(8, (int)Math.Round(size * Layout.Unit(ow, oh)));
             var (r, gg, b) = ParseColor(color);
             g.Append(F($"[{last}]drawtext=fontfile='{FilterPath(Font(bold))}':textfile='{FilterPath(file)}':expansion=none:text_align=C:fontsize={px}:fontcolor=0x{r:X2}{gg:X2}{b:X2}"));
             if (box) g.Append(F($":box=1:boxcolor=black@0.55:boxborderw={TextPad(px)}"));

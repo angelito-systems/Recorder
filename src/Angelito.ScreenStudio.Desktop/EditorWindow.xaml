@@ -57,7 +57,7 @@
             <!-- Preview: same layer order as the exporter -->
             <Border Background="#0D0D12" Margin="12,0,0,0" CornerRadius="8" ClipToBounds="True">
                 <Viewbox Margin="12" Stretch="Uniform">
-                    <Grid x:Name="Stage" ClipToBounds="True" Background="Black" MouseLeftButtonDown="OnStageClick">
+                    <Grid x:Name="Stage" ClipToBounds="True" Background="Black" MouseLeftButtonDown="OnStageClick" MouseMove="OnStageMove" MouseLeftButtonUp="OnStageUp">
                         <Canvas x:Name="ZoomHost" HorizontalAlignment="Left" VerticalAlignment="Top" MouseMove="OnAnnMove" MouseLeftButtonUp="OnAnnUp">
                             <Canvas.RenderTransform><MatrixTransform x:Name="ZoomTransform"/></Canvas.RenderTransform>
                             <MediaElement x:Name="ScreenMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Fill" IsMuted="True"/>
@@ -67,8 +67,8 @@
                         </Canvas>
                         <Border x:Name="CamFrame" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="SizeAll"
                                 MouseLeftButtonDown="OnCamDown" MouseMove="OnCamMove" MouseLeftButtonUp="OnCamUp">
-                            <MediaElement x:Name="CamMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="UniformToFill"
-                                          IsMuted="True" RenderTransformOrigin="0.5,0.5"/>
+                            <MediaElement x:Name="CamMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Fill"
+                                          IsMuted="True" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                         </Border>
                         <Canvas x:Name="TextLayer"/>
                     </Grid>
@@ -91,7 +91,7 @@
                     <StackPanel x:Name="ZoomPanel" Margin="0,8,0,0">
                         <TextBlock x:Name="ZoomInfo" Style="{StaticResource Hint}"/>
                         <TextBlock Text="Intensidad" Margin="0,6,0,0"/>
-                        <Slider x:Name="ZoomScale" Minimum="1.1" Maximum="4" ValueChanged="OnZoomEdit"/>
+                        <Slider x:Name="ZoomScale" Minimum="1" Maximum="4" ValueChanged="OnZoomEdit" ToolTip="1.0× = solo mover el encuadre"/>
                         <TextBlock Text="Suavizado (entrada/salida)"/>
                         <Slider x:Name="ZoomRamp" Minimum="0.1" Maximum="2" ValueChanged="OnZoomEdit"/>
                         <WrapPanel>
@@ -234,9 +234,20 @@
                         <Slider x:Name="SysSync" Minimum="-1" Maximum="1" ValueChanged="OnAudioEdit" ToolTip="Sincronización manual (s)"/>
                     </StackPanel>
 
+                    <TextBlock Style="{StaticResource Section}" Text="Formato"/>
+                    <ComboBox x:Name="FormatBox" SelectionChanged="OnFormatEdit">
+                        <ComboBoxItem Content="Original"/>
+                        <ComboBoxItem Content="16:9 horizontal (YouTube, cursos)"/>
+                        <ComboBoxItem Content="9:16 vertical (TikTok, Reels, Shorts)"/>
+                        <ComboBoxItem Content="1:1 cuadrado"/>
+                        <ComboBoxItem Content="4:3"/>
+                    </ComboBox>
+                    <TextBlock x:Name="FramingHint" Style="{StaticResource Hint}" Margin="0,6,0,0"
+                               Text="Arrastra el video en la vista previa para encuadrar. Los zooms (también de 1.0×) mueven el encuadre en el tiempo."/>
+
                     <TextBlock Style="{StaticResource Section}" Text="Exportación"/>
                     <ComboBox x:Name="ExportHeight" SelectionChanged="OnExportEdit">
-                        <ComboBoxItem Content="Resolución original" Tag="0"/>
+                        <ComboBoxItem Content="Resolución nativa" Tag="0"/>
                         <ComboBoxItem Content="2160p (4K)" Tag="2160"/>
                         <ComboBoxItem Content="1440p" Tag="1440"/>
                         <ComboBoxItem Content="1080p (Full HD)" Tag="1080"/>

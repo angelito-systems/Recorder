@@ -54,9 +54,30 @@ public sealed record Annotation(double Start, double End, AnnotationKind Kind, d
     }
 }
 
+public enum CanvasAspect { Source, Wide, Vertical, Square, Classic }
+
+/// <summary>
+/// Output frame shape. The canvas shows the largest window of its aspect that fits the source; X/Y (normalized source
+/// coordinates) is where that window is centered when no zoom is active, so reframing is editable, never automatic.
+/// </summary>
+public sealed record ProjectCanvas(CanvasAspect Aspect = CanvasAspect.Source, double X = 0.5, double Y = 0.5)
+{
+    public double Ratio(double w, double h) => Aspect switch
+    {
+        CanvasAspect.Wide => 16 / 9.0, CanvasAspect.Vertical => 9 / 16.0, CanvasAspect.Square => 1, CanvasAspect.Classic => 4 / 3.0, _ => w / h,
+    };
+
+    /// <summary>Window size in source pixels.</summary>
+    public (double W, double H) Window(double w, double h)
+    {
+        var r = Ratio(w, h);
+        return r >= w / h ? (w, w / r) : (h * r, h);
+    }
+}
+
 public enum ExportQuality { Fast, Balanced, High }
 
-/// <summary>Height 0 keeps the source size.</summary>
+/// <summary>Height is the short side of the output in pixels; 0 keeps the canvas window's own pixel size.</summary>
 public sealed record ExportSettings(int Height = 0, ExportQuality Quality = ExportQuality.Balanced);
 
 /// <summary>.angelstudio file. Immutable records: every edit produces a new value, which makes undo a stack of values.</summary>
@@ -73,6 +94,7 @@ public sealed record StudioProject
     public WebcamLayout Webcam { get; init; } = new();
     public AudioMix Audio { get; init; } = new();
     public ExportSettings Export { get; init; } = new();
+    public ProjectCanvas Canvas { get; init; } = new();
     public List<TextItem> Texts { get; init; } = [];
     public List<Cue> Subtitles { get; init; } = [];
     public List<Annotation> Annotations { get; init; } = [];

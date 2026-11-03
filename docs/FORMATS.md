@@ -21,6 +21,8 @@
 - `texts`: `{start, end, text, x, y, size, color, background, bold}` — tiempos de origen (siguen al contenido a través de los cortes), centro y tamaño relativos al cuadro de salida.
 - `subtitles`: `{start, end, text}` en tiempo de origen + `subtitleStyle` `{size, y, color, background, burn}`. Importar/exportar SRT convierte a/desde el tiempo del video exportado (los subtítulos dentro de tramos eliminados se omiten; los que cruzan un corte se recortan).
 - `annotations`: `{start, end, kind, x, y, x2, y2, color, thickness}` — `kind`: Rectangle, Ellipse, Arrow, Highlight, Blur, Pixelate. Puntos normalizados al cuadro de **origen** (cola→punta en flechas, esquinas en el resto), así siguen al contenido bajo el zoom.
+- `canvas`: `{aspect, x, y}` — formato de salida (Source, Wide 16:9, Vertical 9:16, Square 1:1, Classic 4:3) y centro de encuadre normalizado al origen. Los zooms (también de escala 1.0) mueven ese encuadre en el tiempo.
+- `export.height`: lado corto de la salida en píxeles (0 = tamaño nativo del encuadre). Tamaños de cámara y textos son relativos al lado corto.
 - `cursor`, `webcam`, `audio`, `export`: estilos y ajustes.
 
 Campos nuevos son opcionales: proyectos anteriores abren sin migración.

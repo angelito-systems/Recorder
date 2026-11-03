@@ -4,8 +4,9 @@ using System.Text;
 namespace Angelito.ScreenStudio.Core;
 
 /// <summary>
-/// The single definition of zoom over time. The editor preview calls <see cref="Evaluate"/>; the exporter emits
-/// <see cref="FfmpegZoomExpr"/>, a literal translation of the same formula, so preview and render agree.
+/// The single definition of the camera over time: the canvas window (aspect + framing center) moved by zoom segments.
+/// The editor preview calls <see cref="ViewRect"/>; the exporter emits <see cref="FfmpegViewExpr"/>, a literal
+/// translation of the same formula, so preview and render agree (checked by a pixel test).
 /// </summary>
 public static class ZoomMath
 {
@@ -17,52 +18,58 @@ public static class ZoomMath
         return a * a * (3 - 2 * a);
     }
 
-    /// <summary>Returns zoom factor (≥1) and normalized center at time t.</summary>
-    public static (double Zoom, double Cx, double Cy) Evaluate(IReadOnlyList<ZoomSegment> zooms, double t)
+    /// <summary>Zoom factor (≥1) and normalized center at time t; the center rests at (bx, by) outside zooms.</summary>
+    public static (double Zoom, double Cx, double Cy) Evaluate(IReadOnlyList<ZoomSegment> zooms, double t, double bx = 0.5, double by = 0.5)
     {
-        double z = 1, cx = 0.5, cy = 0.5;
+        double z = 1, cx = bx, cy = by;
         foreach (var s in zooms)
         {
             var w = Weight(s, t);
             if (w <= 0) continue;
             z += (s.Scale - 1) * w;
-            cx += (s.X - 0.5) * w;
-            cy += (s.Y - 0.5) * w;
+            cx += (s.X - bx) * w;
+            cy += (s.Y - by) * w;
         }
         return (Math.Max(1, z), cx, cy);
     }
 
-    /// <summary>Visible source rectangle in pixels, clamped so the view never leaves the frame.</summary>
-    public static (double X, double Y, double W, double H) ViewRect(IReadOnlyList<ZoomSegment> zooms, double t, double width, double height)
+    /// <summary>Visible source rectangle in pixels (canvas aspect), clamped so the view never leaves the frame.</summary>
+    public static (double X, double Y, double W, double H) ViewRect(IReadOnlyList<ZoomSegment> zooms, double t, double width, double height, ProjectCanvas? canvas = null)
     {
-        var (z, cx, cy) = Evaluate(zooms, t);
-        double w = width / z, h = height / z;
+        canvas ??= new ProjectCanvas();
+        var (cw, ch) = canvas.Window(width, height);
+        var (z, cx, cy) = Evaluate(zooms, t, canvas.X, canvas.Y);
+        double w = cw / z, h = ch / z;
         return (Math.Clamp(cx * width - w / 2, 0, width - w), Math.Clamp(cy * height - h / 2, 0, height - h), w, h);
     }
 
-    /// <summary>zoompan z/x/y expressions (variable "it" = input time) equivalent to <see cref="ViewRect"/>.</summary>
-    public static (string Z, string X, string Y) FfmpegZoomExpr(IReadOnlyList<ZoomSegment> zooms)
+    /// <summary>
+    /// ffmpeg expressions for the view rectangle (x, y, w, h) per frame, for the perspective filter, whose only clock
+    /// is "in" — the 1-based input frame number — so time is (in-1)/fps on the constant-rate stream it receives.
+    /// </summary>
+    public static (string X, string Y, string W, string H) FfmpegViewExpr(IReadOnlyList<ZoomSegment> zooms, ProjectCanvas canvas, int width, int height, int fps)
     {
+        var (cw, ch) = canvas.Window(width, height);
+        var t = F($"((in-1)/{fps})");
         var z = new StringBuilder("1");
-        var cx = new StringBuilder("0.5");
-        var cy = new StringBuilder("0.5");
+        var cx = new StringBuilder(F($"{canvas.X}"));
+        var cy = new StringBuilder(F($"{canvas.Y}"));
         foreach (var s in zooms)
         {
             var r = Math.Max(0.001, Math.Min(s.Ramp, (s.End - s.Start) / 2));
-            var a = F($"min(clip((it-{s.Start})/{r},0,1),clip(({s.End}-it)/{r},0,1))");
+            var a = F($"min(clip(({t}-{s.Start})/{r},0,1),clip(({s.End}-{t})/{r},0,1))");
             var w = $"({a})*({a})*(3-2*({a}))";
             z.Append(F($"+{s.Scale - 1}*{w}"));
-            cx.Append(F($"+{s.X - 0.5}*{w}"));
-            cy.Append(F($"+{s.Y - 0.5}*{w}"));
+            cx.Append(F($"+{s.X - canvas.X}*{w}"));
+            cy.Append(F($"+{s.Y - canvas.Y}*{w}"));
         }
-        return ($"max(1,{z})",
-            $"clip(({cx})*iw-iw/zoom/2,0,iw-iw/zoom)",
-            $"clip(({cy})*ih-ih/zoom/2,0,ih-ih/zoom)");
+        var vw = F($"({cw}/max(1,{z}))");
+        var vh = F($"({ch}/max(1,{z}))");
+        return (F($"clip(({cx})*{width}-{vw}/2,0,{width}-{vw})"), F($"clip(({cy})*{height}-{vh}/2,0,{height}-{vh})"), vw, vh);
     }
 
     private static string F(FormattableString s) => s.ToString(CultureInfo.InvariantCulture);
 }
-
 /// <summary>
 /// Proposes zoom segments from clicks. Proposals are ordinary editable segments, never baked into video.
 /// Clicks are grouped so the camera does not chase every small mouse movement.
