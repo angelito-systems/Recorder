@@ -42,6 +42,7 @@ public partial class EditorWindow : Window
         _path = projectPath;
         _history = new History(StudioProject.Load(projectPath));
         ProjectName.Text = System.IO.Path.GetFileNameWithoutExtension(projectPath);
+        ShowPage("PageZoom");
         if (!LocateSession()) { Loaded += (_, _) => Close(); return; }
 
         _m = SessionManifest.Load(_sessionDir);
@@ -128,6 +129,7 @@ public partial class EditorWindow : Window
         RefreshCanvas();
         if (_selectedZoom >= p.Zooms.Count) _selectedZoom = -1;
         ZoomPanel.IsEnabled = DelZoomBtn.IsEnabled = _selectedZoom >= 0;
+        ZoomPanel.Visibility = _selectedZoom >= 0 ? Visibility.Visible : Visibility.Collapsed; // keep the auto-zoom settings up top
         if (_selectedZoom >= 0)
         {
             var z = p.Zooms[_selectedZoom];
