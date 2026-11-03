@@ -10,7 +10,7 @@ namespace Angelito.ScreenStudio.Desktop.Capture;
 public sealed record Region(int X, int Y, int Width, int Height);
 
 public sealed record RecordOptions(MonitorInfo Monitor, Region? Region, int Fps, string? Webcam, bool Mic, bool SystemAudio,
-    EncoderChoice ScreenEncoder, EncoderChoice CpuEncoder, string Dir, KeyFilter? Keys = null);
+    EncoderChoice ScreenEncoder, EncoderChoice CpuEncoder, string Dir, KeyFilter? Keys = null, WindowInfo? Window = null);
 
 /// <summary>
 /// One recording = one folder of independent streams (see docs/FORMATS.md). Every stream stamps its start against
@@ -34,6 +34,7 @@ public sealed class Recorder
     private StreamWriter? _cursor, _keys;
     private KeyHook? _keyHook;
     private FileStream? _lock;
+    private WindowCapture? _win;
     private double _lastMove = -1, _lastCursorFlush, _pausedTotal, _pausedAt;
     private volatile bool _paused, _videoStopping, _stopping;
     private readonly List<Task> _audioStopped = [];
@@ -52,6 +53,12 @@ public sealed class Recorder
     public Recorder(RecordOptions o)
     {
         _o = o;
+        if (o.Window != null)
+        {
+            using var probe = new WindowCapture(o.Window.Handle);
+            (_ox, _oy, _w, _h) = (0, 0, probe.Width, probe.Height);
+            return;
+        }
         var r = o.Region ?? new Region(0, 0, o.Monitor.Width, o.Monitor.Height);
         // Encoders need even sizes; trim a pixel rather than scale.
         (_ox, _oy, _w, _h) = (r.X, r.Y, r.Width & ~1, r.Height & ~1);
@@ -130,13 +137,7 @@ public sealed class Recorder
         var part = new JournalPart { Screen = $"screen_{n}.mkv", Webcam = _o.Webcam != null ? $"webcam_{n}.mkv" : null };
         lock (_j) _j.Parts.Add(part);
         Journal();
-        var src = $"ddagrab=output_idx={_o.Monitor.OutputIdx}:framerate={_o.Fps}:draw_mouse=1";
-        if (_o.Region != null) src += $":offset_x={_ox}:offset_y={_oy}:video_size={_w}x{_h}";
-        var a = new List<string> { "-f", "lavfi", "-i", src };
-        if (_o.ScreenEncoder.CaptureFilter != "") a.AddRange(["-vf", _o.ScreenEncoder.CaptureFilter]);
-        a.AddRange(_o.ScreenEncoder.QualityArgs(ExportQuality.High));
-        a.AddRange(["-g", (_o.Fps * 2).ToString(), .. SessionFinalizer.CrashSafeMkvArgs, "-y", part.Screen]);
-        _screen = StartFfmpeg(a, "pantalla", t => { part.ScreenStart = t; Journal(); });
+        if (_o.Window != null) StartWindowPart(part); else StartScreenPart(part);
 
         if (part.Webcam != null)
         {
@@ -147,15 +148,43 @@ public sealed class Recorder
         }
     }
 
+    /// <summary>Raw window frames on stdin; wall-clock stamps + constant output fps keep it in sync with the audio.</summary>
+    private void StartWindowPart(JournalPart part)
+    {
+        _win = new WindowCapture(_o.Window!.Handle, (_w, _h));
+        var a = new List<string> { "-f", "rawvideo", "-pix_fmt", "bgra", "-video_size", $"{_w}x{_h}", "-use_wallclock_as_timestamps", "1", "-i", "pipe:0",
+            "-fps_mode", "cfr", "-r", _o.Fps.ToString(), "-pix_fmt", _o.CpuEncoder.CpuPixFmt };
+        a.AddRange(_o.CpuEncoder.QualityArgs(ExportQuality.High));
+        a.AddRange(["-g", (_o.Fps * 2).ToString(), .. SessionFinalizer.CrashSafeMkvArgs, "-y", part.Screen]);
+        _screen = StartFfmpeg(a, "ventana", _ => { });
+        _win.FirstFrame += () => { part.ScreenStart = Elapsed; Journal(); }; // ffmpeg can't report "running" for pipe input
+        _win.Lost += msg => Warning?.Invoke(msg);
+        _win.Start(_screen.Input);
+    }
+
+    private void StartScreenPart(JournalPart part)
+    {
+        var src = $"ddagrab=output_idx={_o.Monitor.OutputIdx}:framerate={_o.Fps}:draw_mouse=1";
+        if (_o.Region != null) src += $":offset_x={_ox}:offset_y={_oy}:video_size={_w}x{_h}";
+        var a = new List<string> { "-f", "lavfi", "-i", src };
+        if (_o.ScreenEncoder.CaptureFilter != "") a.AddRange(["-vf", _o.ScreenEncoder.CaptureFilter]);
+        a.AddRange(_o.ScreenEncoder.QualityArgs(ExportQuality.High));
+        a.AddRange(["-g", (_o.Fps * 2).ToString(), .. SessionFinalizer.CrashSafeMkvArgs, "-y", part.Screen]);
+        _screen = StartFfmpeg(a, "pantalla", t => { part.ScreenStart = t; Journal(); });
+    }
+
     private async Task StopVideoAsync()
     {
         _videoStopping = true;
         var stop = Elapsed;
+        _win?.Stop();
         await Task.WhenAll(
-            _screen?.StopAsync(TimeSpan.FromSeconds(15)) ?? Task.CompletedTask,
+            (_win != null ? _screen?.CloseInputAsync(TimeSpan.FromSeconds(15)) : _screen?.StopAsync(TimeSpan.FromSeconds(15))) ?? Task.CompletedTask,
             _cam?.StopAsync(TimeSpan.FromSeconds(15)) ?? Task.CompletedTask);
+        _win?.Dispose();
         _screen?.Dispose(); _cam?.Dispose();
         _screen = _cam = null;
+        _win = null;
         _j.Parts[^1].Stop = stop;
         Journal();
     }
@@ -222,7 +251,9 @@ public sealed class Recorder
         var t = Elapsed;
         if (kind == 0 && t - _lastMove < 1 / 120.0) return; // moves throttled to 120 Hz; clicks always kept
         if (kind == 0) _lastMove = t;
-        _cursor?.WriteLine(CursorLog.Format(new CursorEvent(t, x - _o.Monitor.X - _ox, y - _o.Monitor.Y - _oy, (CursorKind)kind)));
+        // A captured window can move: measure against where it is now.
+        var (ox, oy) = _o.Window != null ? WindowCapture.Origin(_o.Window.Handle) : (_o.Monitor.X + _ox, _o.Monitor.Y + _oy);
+        _cursor?.WriteLine(CursorLog.Format(new CursorEvent(t, x - ox, y - oy, (CursorKind)kind)));
         if (t - _lastCursorFlush >= 1) { _cursor?.Flush(); _lastCursorFlush = t; }
     }
 

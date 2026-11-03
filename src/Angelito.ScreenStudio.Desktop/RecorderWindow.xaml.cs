@@ -17,6 +17,7 @@ public partial class RecorderWindow : Window
     private readonly Dictionary<int, Task<EncoderChoice>> _screenEnc = new();
     private Task<EncoderChoice>? _cpuEnc;
     private Region? _region;
+    private const string WholeScreen = "Pantalla completa o región";
 
     public RecorderWindow()
     {
@@ -37,6 +38,7 @@ public partial class RecorderWindow : Window
             MonitorBox.ItemsSource = await monitors;
             MonitorBox.SelectedIndex = 0;
             MonitorBox.SelectionChanged += (_, _) => OnFullScreen(this, new RoutedEventArgs());
+            OnWindowListOpen(this, EventArgs.Empty);
             CamBox.ItemsSource = new[] { NoCam }.Concat(await cams).ToList();
             CamBox.SelectedIndex = 0;
             if (MonitorBox.Items.Count == 0) { Status.Text = "No se encontró ninguna pantalla que se pueda capturar."; return; }
@@ -109,7 +111,7 @@ public partial class RecorderWindow : Window
             var cam = CamBox.SelectedItem as string;
             var dir = Path.Combine(App.RecordingsDir, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
             _rec = new Recorder(new RecordOptions(mon, _region, int.Parse((string)((ComboBoxItem)FpsBox.SelectedItem).Tag), cam == NoCam ? null : cam,
-                MicBox.IsChecked == true, SysBox.IsChecked == true, await ScreenEncoder(mon), await _cpuEnc!, dir, KeyFilterOrNull()));
+                MicBox.IsChecked == true, SysBox.IsChecked == true, await ScreenEncoder(mon), await _cpuEnc!, dir, KeyFilterOrNull(), WindowBox.SelectedItem as WindowInfo));
             _rec.Warning += msg => Dispatcher.BeginInvoke(() => { App.Log(msg); Status.Text = msg; });
             _rec.Start();
             SetRecording(true);
@@ -148,10 +150,11 @@ public partial class RecorderWindow : Window
         RecordBtn.IsEnabled = true;
         RecordBtn.Content = on ? "■ Detener" : "● Grabar";
         Timer.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        MonitorBox.IsEnabled = CamBox.IsEnabled = FpsBox.IsEnabled = MicBox.IsEnabled = SysBox.IsEnabled = KeysBox.IsEnabled = RegionBtn.IsEnabled = FullBtn.IsEnabled = OpenBtn.IsEnabled = !on;
+        MonitorBox.IsEnabled = CamBox.IsEnabled = FpsBox.IsEnabled = MicBox.IsEnabled = SysBox.IsEnabled = KeysBox.IsEnabled = WindowBox.IsEnabled = RegionBtn.IsEnabled = FullBtn.IsEnabled = OpenBtn.IsEnabled = !on;
         PauseBtn.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         PauseBtn.IsEnabled = true;
         PauseBtn.Content = "❚❚ Pausar";
+        if (!on) OnWindowPick(this, null!); // a chosen window keeps the monitor/region controls disabled
         if (on) _tick.Start(); else { _tick.Stop(); MicMeter.Value = SysMeter.Value = 0; }
     }
 
@@ -187,6 +190,23 @@ public partial class RecorderWindow : Window
             Status.Text = "No se pudo pausar/reanudar: " + ex.Message;
         }
         PauseBtn.IsEnabled = RecordBtn.IsEnabled = true;
+    }
+
+    /// <summary>Refreshes the window list each time it opens (windows come and go); keeps the current pick if it still exists.</summary>
+    private void OnWindowListOpen(object? sender, EventArgs e)
+    {
+        var current = WindowBox.SelectedItem as WindowInfo;
+        var items = new List<object> { WholeScreen };
+        items.AddRange(WindowCapture.List());
+        WindowBox.ItemsSource = items;
+        WindowBox.SelectedItem = items.OfType<WindowInfo>().FirstOrDefault(w => w.Handle == current?.Handle) ?? (object)WholeScreen;
+    }
+
+    private void OnWindowPick(object sender, SelectionChangedEventArgs e)
+    {
+        var window = WindowBox.SelectedItem is WindowInfo;
+        AreaRow.IsEnabled = MonitorBox.IsEnabled = !window;
+        AreaText.Text = window ? "Se graba solo la ventana elegida" : _region == null ? "Pantalla completa" : AreaText.Text;
     }
 
     private void OnRegion(object sender, RoutedEventArgs e)

@@ -64,6 +64,19 @@ public sealed class FfmpegProcess : IDisposable
         catch (OperationCanceledException) { Kill(); }
     }
 
+    /// <summary>stdin, for processes reading raw frames from "pipe:0".</summary>
+    public Stream Input => _p.StandardInput.BaseStream;
+
+    /// <summary>Ends a pipe-fed process cleanly: EOF on stdin lets ffmpeg finalize the file ("q" would corrupt the frame stream).</summary>
+    public async Task CloseInputAsync(TimeSpan timeout)
+    {
+        if (_p.HasExited) return;
+        try { _p.StandardInput.Close(); } catch (IOException) { }
+        using var cts = new CancellationTokenSource(timeout);
+        try { await _p.WaitForExitAsync(cts.Token); }
+        catch (OperationCanceledException) { Kill(); }
+    }
+
     public void Kill() { try { if (!_p.HasExited) _p.Kill(true); } catch (InvalidOperationException) { } }
 
     /// <summary>Runs to completion. Returns exit code and the last stderr lines (for error messages).</summary>

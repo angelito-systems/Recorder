@@ -18,7 +18,9 @@
             </ComboBox>
         </Grid>
 
-        <DockPanel Margin="0,8,0,0">
+        <ComboBox x:Name="WindowBox" Margin="0,8,0,0" DropDownOpened="OnWindowListOpen" SelectionChanged="OnWindowPick"
+                  ToolTip="Graba solo esa ventana, aunque otras la tapen"/>
+        <DockPanel x:Name="AreaRow" Margin="0,8,0,0">
             <Button x:Name="RegionBtn" DockPanel.Dock="Right" Content="Seleccionar región…" Click="OnRegion"/>
             <Button x:Name="FullBtn" DockPanel.Dock="Right" Content="Completa" Click="OnFullScreen" Margin="0,0,6,0" Visibility="Collapsed"/>
             <TextBlock x:Name="AreaText" VerticalAlignment="Center" Text="Pantalla completa"/>
