@@ -11,7 +11,8 @@ public sealed record Region(int X, int Y, int Width, int Height);
 
 public sealed record RecordOptions(MonitorInfo Monitor, Region? Region, int Fps, string? Webcam, bool Mic, bool SystemAudio,
     EncoderChoice ScreenEncoder, EncoderChoice CpuEncoder, string Dir, KeyFilter? Keys = null, WindowInfo? Window = null,
-    string? MicId = null, string? SpeakerId = null); // audio endpoint ids; null = Windows default
+    string? MicId = null, string? SpeakerId = null, // audio endpoint ids; null = Windows default
+    bool EditableCursor = true); // video without the cursor; its real shapes are recorded and drawn by the editor
 
 /// <summary>
 /// One recording = one folder of independent streams (see docs/FORMATS.md). Every stream stamps its start against
@@ -39,6 +40,13 @@ public sealed class Recorder
     private double _lastMove = -1, _lastCursorFlush, _pausedTotal, _pausedAt;
     private volatile bool _paused, _videoStopping, _stopping;
     private readonly List<Task> _audioStopped = [];
+    private CursorShapeStore? _shapes;
+    private StreamWriter? _shapeLog;
+    private Timer? _shapePoll;
+    private (IntPtr Handle, bool Visible)? _lastShape; // null = write the current shape on the next poll
+    private int _polling;
+    private (int X, int Y) _lastPolledPos = (int.MinValue, int.MinValue);
+    private readonly object _cursorLock = new();
     private readonly int _ox, _oy, _w, _h;
 
     public double Elapsed => _clock.Elapsed.TotalSeconds;
@@ -80,6 +88,15 @@ public sealed class Recorder
         _clock.Start();
 
         _cursor = new StreamWriter(Path.Combine(_o.Dir, "cursor.raw.txt"));
+        if (_o.EditableCursor)
+        {
+            _j.EditableCursor = true;
+            _j.CursorScale = CursorDisplayScale();
+            Journal();
+            _shapes = new CursorShapeStore(_o.Dir);
+            _shapeLog = new StreamWriter(Path.Combine(_o.Dir, "cursor-shapes.raw.txt")) { AutoFlush = true }; // shape changes are rare
+            _shapePoll = new Timer(_ => PollShape(), null, 0, 16);
+        }
         _hook = new MouseHook();
         _hook.Event += OnMouse;
         if (_o.Keys != null)
@@ -128,6 +145,7 @@ public sealed class Recorder
         if (!_paused) return;
         _pausedTotal += Elapsed - _pausedAt;
         StartVideo();
+        _lastShape = null; // changes during the pause weren't logged: state the current shape again
         _paused = false;
     }
 
@@ -153,7 +171,7 @@ public sealed class Recorder
     /// <summary>Raw window frames on stdin; wall-clock stamps + constant output fps keep it in sync with the audio.</summary>
     private void StartWindowPart(JournalPart part)
     {
-        _win = new WindowCapture(_o.Window!.Handle, (_w, _h));
+        _win = new WindowCapture(_o.Window!.Handle, (_w, _h), cursor: !_o.EditableCursor);
         var a = new List<string> { "-f", "rawvideo", "-pix_fmt", "bgra", "-video_size", $"{_w}x{_h}", "-use_wallclock_as_timestamps", "1", "-i", "pipe:0",
             "-fps_mode", "cfr", "-r", _o.Fps.ToString(), "-pix_fmt", _o.CpuEncoder.BgraInputPixFmt };
         a.AddRange(_o.CpuEncoder.QualityArgs(ExportQuality.High));
@@ -166,7 +184,7 @@ public sealed class Recorder
 
     private void StartScreenPart(JournalPart part)
     {
-        var src = $"ddagrab=output_idx={_o.Monitor.OutputIdx}:framerate={_o.Fps}:draw_mouse=1";
+        var src = $"ddagrab=output_idx={_o.Monitor.OutputIdx}:framerate={_o.Fps}:draw_mouse={(_o.EditableCursor ? 0 : 1)}";
         if (_o.Region != null) src += $":offset_x={_ox}:offset_y={_oy}:video_size={_w}x{_h}";
         var a = new List<string> { "-f", "lavfi", "-i", src };
         if (_o.ScreenEncoder.CaptureFilter != "") a.AddRange(["-vf", _o.ScreenEncoder.CaptureFilter]);
@@ -247,16 +265,54 @@ public sealed class Recorder
         return max;
     }
 
-    private void OnMouse(int x, int y, int kind)
+    /// <summary>
+    /// 60 Hz: which cursor Windows shows. Only changes are logged, and a handle is captured once (CursorShapeStore caches
+    /// by handle and by image), so steady state costs one GetCursorInfo call per tick.
+    /// </summary>
+    private void PollShape()
+    {
+        if (_paused || Interlocked.Exchange(ref _polling, 1) == 1) return;
+        try
+        {
+            var cur = CursorCapture.Current();
+            // Programmatic moves (SetCursorPos, remote desktop, automation) never reach the mouse hook; log them here.
+            if ((cur.X, cur.Y) != _lastPolledPos) { _lastPolledPos = (cur.X, cur.Y); OnMouse(cur.X, cur.Y, 0, fromPoll: true); }
+            if (_lastShape == (cur.Handle, cur.Visible)) return;
+            _lastShape = (cur.Handle, cur.Visible);
+            var id = !cur.Visible ? CursorShapeLog.Hidden : _shapes!.Resolve(cur.Handle) ?? CursorShapeLog.Unknown;
+            _shapeLog?.WriteLine(CursorShapeLog.Format(Elapsed, id));
+        }
+        catch (Exception e) when (e is IOException or ObjectDisposedException) { }
+        finally { Volatile.Write(ref _polling, 0); }
+    }
+
+    /// <summary>
+    /// How much larger Windows displays cursors on the recorded monitor than their bitmaps (per-monitor DPI):
+    /// the cursor size Windows uses there ÷ the captured arrow's width.
+    /// </summary>
+    private double CursorDisplayScale()
+    {
+        var arrow = CursorCapture.Capture(CursorCapture.SystemArrow);
+        var dpi = _o.Window != null ? Native.GetDpiForWindow(_o.Window.Handle) : Native.MonitorDpi(_o.Monitor.X + 1, _o.Monitor.Y + 1);
+        var shown = Native.GetSystemMetricsForDpi(13 /* SM_CXCURSOR */, dpi);
+        return arrow is var (s, _) && s.W > 0 && shown > 0 ? Math.Round(shown / (double)s.W, 3) : 1;
+    }
+
+    private void OnMouse(int x, int y, int kind) => OnMouse(x, y, kind, fromPoll: false);
+
+    private void OnMouse(int x, int y, int kind, bool fromPoll)
     {
         if (_paused) return;
-        var t = Elapsed;
-        if (kind == 0 && t - _lastMove < 1 / 120.0) return; // moves throttled to 120 Hz; clicks always kept
-        if (kind == 0) _lastMove = t;
-        // A captured window can move: measure against where it is now.
-        var (ox, oy) = _o.Window != null ? WindowCapture.Origin(_o.Window.Handle) : (_o.Monitor.X + _ox, _o.Monitor.Y + _oy);
-        _cursor?.WriteLine(CursorLog.Format(new CursorEvent(t, x - ox, y - oy, (CursorKind)kind)));
-        if (t - _lastCursorFlush >= 1) { _cursor?.Flush(); _lastCursorFlush = t; }
+        lock (_cursorLock) // the hook thread and the 60 Hz poll both write here
+        {
+            var t = Elapsed;
+            if (kind == 0 && !fromPoll && t - _lastMove < 1 / 120.0) return; // hook moves throttled to 120 Hz; clicks always kept
+            if (kind == 0) _lastMove = t;
+            // A captured window can move: measure against where it is now.
+            var (ox, oy) = _o.Window != null ? WindowCapture.Origin(_o.Window.Handle) : (_o.Monitor.X + _ox, _o.Monitor.Y + _oy);
+            _cursor?.WriteLine(CursorLog.Format(new CursorEvent(t, x - ox, y - oy, (CursorKind)kind)));
+            if (t - _lastCursorFlush >= 1) { _cursor?.Flush(); _lastCursorFlush = t; }
+        }
     }
 
     /// <summary>Stops every stream, finalizes files and returns the session folder.</summary>
@@ -264,6 +320,9 @@ public sealed class Recorder
     {
         _hook?.Dispose();
         _keyHook?.Dispose();
+        if (_shapePoll != null) await _shapePoll.DisposeAsync();
+        while (Volatile.Read(ref _polling) == 1) await Task.Delay(5);
+        _shapeLog?.Dispose();
         if (!_paused) await StopVideoAsync();
         _stopping = true;
         _mic?.StopRecording();

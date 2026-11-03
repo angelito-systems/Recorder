@@ -99,7 +99,8 @@ public static class RenderQueue
             var gpu = job.Project.Zooms.Count > 0 && fmt is not (ExportFormat.Wav or ExportFormat.Png) ? await (s_cameraGpu ??= EncoderProbe.CameraGpuAsync()) : -1;
             ExportPlan Plan(int vk) => Exporter.Build(job.Project, job.Manifest, job.SessionDir, job.Cursor, enc, part, graph,
                 i => job.AnnotationImages.TryGetValue(i, out var v) ? v : null,
-                job.Keys, c => job.KeyImages.TryGetValue(c, out var k) ? k : null, vk);
+                job.Keys, c => job.KeyImages.TryGetValue(c, out var k) ? k : null, vk,
+                CursorTrack.ForSession(job.Project, job.Manifest, job.SessionDir, job.Cursor, job.Project.Segments.Max(s => s.End) + 1));
             var ui = Application.Current.Dispatcher;
             try { await Exporter.RunAsync(Plan(gpu), graph, v => ui.BeginInvoke(() => job.Progress = v), job.Cts.Token); }
             catch (Exception ex) when (gpu >= 0 && !job.Cts.IsCancellationRequested)

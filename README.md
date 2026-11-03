@@ -8,6 +8,7 @@ Grabador y editor de pantalla para Windows 10/11 — Angelito Systems S.A.C. · 
 ## Qué hace
 
 - **Graba** pantalla completa, una región o una sola ventana (aunque esté tapada), con webcam, micrófono, audio del sistema, cursor y clics, cada uno en su propio archivo. Codificador por GPU detectado solo (NVENC, QSV, AMF) o CPU.
+- **Cursor editable con su forma real** (texto, mano, redimensionar, animados, cursores de cada programa): suavizado, tamaño, opacidad o una imagen propia, sin tocar el video.
 - **Pausa y atajos globales**: Ctrl+Mayús+F9 pausa/reanuda, Ctrl+Mayús+F10 graba/detiene.
 - **Recupera** grabaciones interrumpidas por un cierre inesperado o un corte de luz.
 - **Edita**: cortes, zoom automático hacia los clics y zoom manual, webcam con forma y posición, textos, subtítulos (SRT), anotaciones (flechas, formas, desenfoque y pixelado), visualizador de atajos de teclado y formatos 16:9, 9:16, 1:1 y 4:3.

@@ -73,6 +73,11 @@ public static class SessionFinalizer
         m.MicOffset = m.SystemAudioOffset = 0;
 
         RetimeLines(dir, "cursor.raw.txt", m.Cursor, l => CursorLog.TryParse(l, out var e) && Parts.ToVideoTime(parts, e.T) is { } t ? CursorLog.Format(e with { T = t }) : null);
+        if (j.EditableCursor)
+        {
+            RetimeLines(dir, "cursor-shapes.raw.txt", "cursor-shapes.txt", l => CursorShapeLog.TryParse(l, out var st, out var id) && Parts.ToVideoTime(parts, st) is { } t ? CursorShapeLog.Format(t, id) : null);
+            (m.CursorInVideo, m.CursorShapes, m.CursorScale) = (false, "cursor-shapes.txt", j.CursorScale);
+        }
         if (j.Keys)
         {
             RetimeLines(dir, "keys.raw.txt", "keys.txt", l => KeyLog.TryParse(l, out var k) && Parts.ToVideoTime(parts, k.T) is { } t ? KeyLog.Format(k with { T = t }) : null);

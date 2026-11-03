@@ -36,7 +36,7 @@ public partial class EditorWindow
         var adv = _advanced;
         ModeBox.SelectedIndex = adv ? 1 : 0;
         var v = adv ? Visibility.Visible : Visibility.Collapsed;
-        RailCursor.Visibility = RailText.Visibility = RailSubs.Visibility = RailAnn.Visibility = RailFormat.Visibility = v;
+        RailText.Visibility = RailSubs.Visibility = RailAnn.Visibility = RailFormat.Visibility = v;
         RailKeys.Visibility = adv && _m?.Keys != null ? Visibility.Visible : Visibility.Collapsed;
         RailCamera.Visibility = _m?.Webcam != null ? Visibility.Visible : Visibility.Collapsed;
         RailAudio.Visibility = _m?.Mic != null || _m?.SystemAudio != null ? Visibility.Visible : Visibility.Collapsed;

@@ -59,7 +59,8 @@ public static class Exporter
 
     public static ExportPlan Build(StudioProject p, SessionManifest m, string sessionDir, IReadOnlyList<CursorEvent> cursor,
         EncoderChoice enc, string outPath, string graphPath, Func<int, (string Png, int X, int Y)?>? annotationImage = null,
-        IReadOnlyList<KeyEvent>? keys = null, Func<string, (string Png, int W, int H)?>? keyImage = null, int vulkanDevice = -1)
+        IReadOnlyList<KeyEvent>? keys = null, Func<string, (string Png, int W, int H)?>? keyImage = null, int vulkanDevice = -1,
+        CursorTrack? pointer = null)
     {
         if (p.Segments.Count == 0) throw new InvalidOperationException("No hay segmentos para exportar.");
         var (ow, oh) = Layout.OutputSize(m, p.Export, p.Canvas);
@@ -123,6 +124,9 @@ public static class Exporter
                     last = $"c{i}";
                 }
             }
+
+            // The real cursor, in source pixels (so it zooms with the content), above the click rings.
+            if (pointer != null) last = PointerStage(g, args, files, ref input, last, pointer, p, sessionDir, graphPath, fps, srcEnd);
 
             // Camera: canvas window moved by zooms → output size. perspective samples sub-pixel (no zoompan shimmer);
             // without zooms the window is static and a plain crop is much cheaper.
@@ -347,6 +351,75 @@ public static class Exporter
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), bold ? "segoeuib.ttf" : "segoeui.ttf");
 
     /// <summary>Path inside a quoted filter option: forward slashes, escaped drive colon and quotes.</summary>
+    /// <summary>
+    /// One overlay per cursor shape used. A shape's frames are stacked in one PNG; a per-frame command file (sendcmd)
+    /// sets each overlay's position (off-frame when that shape isn't showing), the crop picking the animation frame, and
+    /// the opacity — all read from <see cref="CursorTrack.At"/>, the function the preview draws with.
+    /// </summary>
+    private static string PointerStage(StringBuilder g, List<string> args, Dictionary<string, string> files, ref int input, string last,
+        CursorTrack pointer, StudioProject p, string sessionDir, string graphPath, int fps, double srcEnd)
+    {
+        var frames = (int)Math.Ceiling(srcEnd * fps);
+        var states = Enumerable.Range(0, frames + 1).Select(k => pointer.At(k / (double)fps, fps)).ToArray();
+        var used = states.Where(st => st.ShapeId != null).Select(st => st.ShapeId!).Distinct().ToList();
+        if (used.Count == 0) return last;
+
+        var dir = Path.GetDirectoryName(Path.GetFullPath(graphPath))!;
+        var stem = Path.GetFileNameWithoutExtension(graphPath);
+        var scale = states.First(st => st.ShapeId != null).Scale; // constant for a project
+        var slot = new Dictionary<string, (int Index, CursorShape Shape)>();
+        foreach (var id in used)
+        {
+            var shape = pointer.Shape(id)!;
+            string png;
+            if (id == CursorTrack.CustomShapeId) png = Path.Combine(sessionDir, p.Pointer.CustomImage!);
+            else
+            {
+                png = Path.Combine(dir, $"{stem}.cursor-{id}.png");
+                var px = File.ReadAllBytes(CursorShapeStore.PixelsPath(sessionDir, id));
+                Png.WriteBgra(png, shape.W, shape.H * shape.Frames, px);
+            }
+            var i = slot.Count;
+            slot[id] = (i, shape);
+            int sw = Math.Max(1, (int)Math.Round(shape.W * scale)), sh = Math.Max(1, (int)Math.Round(shape.H * scale));
+            args.AddRange(["-loop", "1", "-framerate", F($"{fps}"), "-t", F($"{srcEnd:F3}"), "-i", png]);
+            g.Append(F($"[{input}:v]format=rgba,crop@pc{i}=w={shape.W}:h={shape.H}:x=0:y=0,scale={sw}:{sh}:flags=lanczos,colorchannelmixer@pa{i}=aa=1[pq{i}];\n"));
+            input++;
+        }
+
+        // Commands only when something changes; times sit just before each frame so the value applies to it.
+        var cmd = new StringBuilder();
+        var prev = new (int X, int Y, int Crop, double A)[used.Count];
+        Array.Fill(prev, (int.MinValue, int.MinValue, -1, -1));
+        for (var k = 0; k <= frames; k++)
+        {
+            var st = states[k];
+            var parts = new List<string>();
+            foreach (var (id, (i, shape)) in slot)
+            {
+                var on = st.ShapeId == id;
+                var now = on ? ((int)Math.Round(st.X), (int)Math.Round(st.Y), st.Frame * shape.H, Math.Round(st.Alpha, 3)) : (-100000, -100000, prev[i].Crop < 0 ? 0 : prev[i].Crop, prev[i].A < 0 ? 1 : prev[i].A);
+                if (now.Item1 != prev[i].X) parts.Add(F($"overlay@po{i} x {now.Item1}"));
+                if (now.Item2 != prev[i].Y) parts.Add(F($"overlay@po{i} y {now.Item2}"));
+                if (now.Item3 != prev[i].Crop) parts.Add(F($"crop@pc{i} y {now.Item3}"));
+                if (now.Item4 != prev[i].A) parts.Add(F($"colorchannelmixer@pa{i} aa {now.Item4}"));
+                prev[i] = now;
+            }
+            if (parts.Count > 0) cmd.Append(F($"{Math.Max(0, k / (double)fps - 0.0005):F4} ")).Append(string.Join(", ", parts)).Append(";\n");
+        }
+        var cmdFile = Path.Combine(dir, stem + ".cursor.cmd");
+        files[cmdFile] = cmd.ToString();
+
+        g.Append($"[{last}]sendcmd=f='{FilterPath(cmdFile)}'[ps];\n");
+        last = "ps";
+        foreach (var (_, (i, _)) in slot)
+        {
+            g.Append(F($"[{last}][pq{i}]overlay@po{i}=x=-100000:y=-100000:eval=frame:eof_action=pass[pv{i}];\n"));
+            last = $"pv{i}";
+        }
+        return last;
+    }
+
     private static string FilterPath(string path) => path.Replace('\\', '/').Replace(":", "\\:").Replace("'", "\\'");
 
     public static (int R, int G, int B) ParseColor(string hex)

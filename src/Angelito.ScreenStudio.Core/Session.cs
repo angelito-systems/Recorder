@@ -31,6 +31,15 @@ public sealed class SessionManifest
     public string? SystemAudio { get; set; }
     public double SystemAudioOffset { get; set; }
     public string Cursor { get; set; } = "cursor.txt";
+    /// <summary>
+    /// True when Windows drew the cursor into the screen video (every recording made before the editable cursor, hence
+    /// the default): then nothing is drawn over it, so it is never duplicated. False: the video has no cursor and the
+    /// editor draws the captured shapes (CursorShapes log + cursors/ folder).
+    /// </summary>
+    public bool CursorInVideo { get; set; } = true;
+    public string? CursorShapes { get; set; }
+    /// <summary>Monitor DPI ÷ system DPI at recording time: how much larger Windows displayed the cursor bitmaps.</summary>
+    public double CursorScale { get; set; } = 1;
     /// <summary>Allowed shortcuts only ("t Ctrl+S" per line); null when the keystroke overlay was off.</summary>
     public string? Keys { get; set; }
 
@@ -60,6 +69,16 @@ public sealed class SessionManifest
         {
             if (CursorLog.TryParse(line, out var e)) list.Add(e with { T = e.T - ScreenOffset });
         }
+        return list;
+    }
+
+    /// <summary>Cursor shape changes in screen-video time; empty for recordings with the cursor in the video.</summary>
+    public List<(double T, string Id)> LoadCursorShapes(string dir)
+    {
+        var list = new List<(double, string)>();
+        if (CursorInVideo || CursorShapes == null || !File.Exists(Path.Combine(dir, CursorShapes))) return list;
+        foreach (var line in File.ReadLines(Path.Combine(dir, CursorShapes)))
+            if (CursorShapeLog.TryParse(line, out var t, out var id)) list.Add((t - ScreenOffset, id));
         return list;
     }
 
@@ -110,6 +129,9 @@ public sealed class RecordingJournal
     public bool Mic { get; set; }
     public bool SystemAudio { get; set; }
     public bool Keys { get; set; }
+    /// <summary>Screen captured without the cursor; shapes go to cursor-shapes.raw.txt and cursors/.</summary>
+    public bool EditableCursor { get; set; }
+    public double CursorScale { get; set; } = 1;
     public double? MicOffset { get; set; }
     public double? SystemOffset { get; set; }
 }
