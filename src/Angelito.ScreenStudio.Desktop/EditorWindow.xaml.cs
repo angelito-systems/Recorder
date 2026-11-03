@@ -57,6 +57,7 @@ public partial class EditorWindow : Window
         Open(CamMedia, _m.Webcam);
         Open(MicMedia, _m.Mic);
         Open(SysMedia, _m.SystemAudio);
+        StartMediaCache();
         CamSection.Visibility = CamFrame.Visibility = _m.Webcam != null ? Visibility.Visible : Visibility.Collapsed;
         MicSection.Visibility = _m.Mic != null ? Visibility.Visible : Visibility.Collapsed;
         SysSection.Visibility = _m.SystemAudio != null ? Visibility.Visible : Visibility.Collapsed;
@@ -295,7 +296,7 @@ public partial class EditorWindow : Window
 
     // ---------- timeline ----------
 
-    private const double RulerH = 18, SegTop = 26, SegH = 40, ZoomTop = 74, ZoomH = 26, TextTop = 108, CueTop = 132, AnnTop = 156, RowH = 20, ClickTop = 182;
+    private const double RulerH = 18, SegTop = 26, SegH = 40, ZoomTop = 74, ZoomH = 26, TextTop = 108, CueTop = 132, AnnTop = 156, RowH = 20, AudioTop = 180, AudioH = 26, ClickTop = 210;
 
     private void OnTimelineResize(object sender, SizeChangedEventArgs e) => DrawTimeline();
 
@@ -323,8 +324,8 @@ public partial class EditorWindow : Window
             {
                 Width = Math.Max(2, X(s.End) - X(s.Start) - 2), Height = SegH, CornerRadius = new CornerRadius(5),
                 Background = new SolidColorBrush(Color.FromRgb(0x3A, 0x33, 0x66)), BorderBrush = brand, BorderThickness = new Thickness(1),
-                Child = new TextBlock { Text = $"Clip {i + 1} · {Fmt(s.Duration, false)}", Foreground = Brushes.White, FontSize = 11, Margin = new Thickness(6, 4, 0, 0) },
-                IsHitTestVisible = false,
+                Child = ClipContent(s, $"Clip {i + 1} · {Fmt(s.Duration, false)}", Math.Max(2, X(s.End) - X(s.Start) - 2)),
+                IsHitTestVisible = false, ClipToBounds = true,
             };
             Canvas.SetLeft(r, X(s.Start) + 1);
             Canvas.SetTop(r, SegTop);
@@ -350,6 +351,7 @@ public partial class EditorWindow : Window
 
         DrawTextRows(X);
         DrawAnnotationRow(X);
+        DrawAudioRow(X);
 
         foreach (var c in _clicks)
             Timeline.Children.Add(new Line { X1 = X(c.T), X2 = X(c.T), Y1 = ClickTop, Y2 = ClickTop + 10, Stroke = Brushes.Goldenrod, StrokeThickness = 1 });
@@ -594,6 +596,7 @@ public partial class EditorWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         CompositionTarget.Rendering -= OnFrame;
+        _cacheCts.Cancel();
         _autosave.Stop();
         _exportCts?.Cancel();
         if (_dirty && _m != null) Save();

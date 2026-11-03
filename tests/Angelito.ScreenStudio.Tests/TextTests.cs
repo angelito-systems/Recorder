@@ -108,6 +108,38 @@ public class MaskTests
     }
 }
 
+public class MediaCacheTests
+{
+    [Fact]
+    public async Task ThumbnailsAreGeneratedOnceAndCoverTheVideo()
+    {
+        var dir = Directory.CreateTempSubdirectory("ass-cache").FullName;
+        var video = Path.Combine(dir, "screen.mp4");
+        Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=7", "-g", "60", "-c:v", "libx264", "-pix_fmt", "yuv420p", video])).Code);
+        var thumbs = await MediaCache.ThumbnailsAsync(video, dir, 7, CancellationToken.None);
+        Assert.True(File.Exists(MediaCache.ThumbPath(thumbs, 0)));
+        Assert.True(File.Exists(MediaCache.ThumbPath(thumbs, 2))); // t = 4 s (the fps filter may drop the very last slot)
+        var stamp = File.GetLastWriteTimeUtc(MediaCache.ThumbPath(thumbs, 0));
+        await MediaCache.ThumbnailsAsync(video, dir, 7, CancellationToken.None);
+        Assert.Equal(stamp, File.GetLastWriteTimeUtc(MediaCache.ThumbPath(thumbs, 0))); // reused, not regenerated
+    }
+
+    [Fact]
+    public async Task PeaksFollowLoudness()
+    {
+        var dir = Directory.CreateTempSubdirectory("ass-cache").FullName;
+        var wav = Path.Combine(dir, "mic.wav");
+        // 1 s of silence, then 1 s of a loud tone
+        Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=1", "-f", "lavfi", "-i", "sine=f=440:d=1:r=48000",
+            "-filter_complex", "[1]volume=7,aformat=channel_layouts=stereo[s];[0][s]concat=n=2:v=0:a=1", wav])).Code);
+        var peaks = await MediaCache.PeaksAsync(wav, dir, CancellationToken.None);
+        Assert.InRange(peaks.Length, 195, 205);
+        Assert.True(peaks.Take(90).All(p => p < 3));
+        Assert.True(peaks.Skip(110).Take(80).All(p => p > 150));
+        Assert.Equal(peaks, await MediaCache.PeaksAsync(wav, dir, CancellationToken.None));
+    }
+}
+
 public class TimeMappingTests
 {
     // Source 0-10 with 4-6 removed: output is 8 s long.

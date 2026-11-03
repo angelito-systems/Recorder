@@ -26,7 +26,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="5"/>
-            <RowDefinition Height="250" MinHeight="180"/>
+            <RowDefinition Height="280" MinHeight="200"/>
         </Grid.RowDefinitions>
 
         <!-- Top bar -->
@@ -260,7 +260,7 @@
                 <Button x:Name="PlayBtn" Content="▶" Width="44" Click="OnPlay" ToolTip="Reproducir / pausar (Espacio)"/>
                 <TextBlock x:Name="TimeText" VerticalAlignment="Center" Margin="12,0" FontFamily="Cascadia Mono, Consolas"/>
                 <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" HorizontalAlignment="Right"
-                           Text="Filas: clips · zoom · texto · subtítulos · anotaciones · clics    Espacio: reproducir · S: dividir · Supr: eliminar tramo · ←/→: fotograma · Ctrl+Z/Y"/>
+                           Text="Filas: clips · zoom · texto · subtítulos · anotaciones · audio · clics    Espacio: reproducir · S: dividir · Supr: eliminar tramo · ←/→: fotograma · Ctrl+Z/Y"/>
             </DockPanel>
             <Border CornerRadius="6" Background="#14141B" ClipToBounds="True">
                 <Canvas x:Name="Timeline" Background="Transparent" SizeChanged="OnTimelineResize"
