@@ -74,13 +74,26 @@ public class KeyFilterTests
         var outPath = Path.Combine(dir, "out.mp4");
         var plan = Exporter.Build(p, m, dir, [], EncoderProbe.Cpu, outPath, Path.Combine(dir, "g.txt"),
             keys: [new(0.5, "Ctrl+C"), new(1.0, "Ctrl+V"), new(2.0, "Ctrl+C")], keyImage: _ => (png, 120, 40));
-        Assert.Equal(3, plan.FilterGraph.Split('\n').Count(l => l.Contains("[kq") && l.Contains("overlay="))); // one overlay per showing
+        Assert.Equal(3, plan.FilterGraph.Split('\n').Count(l => l.Contains("[kf") && l.Contains("overlay="))); // one overlay per showing
         Assert.Equal(2, plan.Args.Count(a => a == png));           // one image input per distinct shortcut
         await Exporter.RunAsync(plan, Path.Combine(dir, "g.txt"), _ => { }, CancellationToken.None);
 
         // Box centered at (0.5, 0.8) of 640×360 → x 260..380, y 268..308. White while shown (0.5–1.0 s), absent before.
         Assert.True(await WhiteAt(outPath, 0.7) > 30, "keystroke not drawn");
         Assert.True(await WhiteAt(outPath, 0.2) < 15, "keystroke drawn outside its window");
+        // Fade-in: 2 frames after the start it's partly transparent, so less white than when fully shown.
+        var fading = await WhiteAt(outPath, 0.5 + 2 / 30.0);
+        Assert.True(fading > 1 && fading < await WhiteAt(outPath, 0.7) - 5, $"no fade-in ({fading})");
+    }
+
+    [Fact]
+    public void FadeCurve()
+    {
+        Assert.Equal(0, Layout.FadeAlpha(0.9, 1, 3));
+        Assert.Equal(0.5, Layout.FadeAlpha(1.1, 1, 3), 6);
+        Assert.Equal(1, Layout.FadeAlpha(2, 1, 3));
+        Assert.Equal(0.5, Layout.FadeAlpha(2.9, 1, 3), 6);
+        Assert.Equal(1, Layout.FadeAlpha(1.1, 1, 1.2), 6); // short item: fade is half its length
     }
 
     private static async Task<double> WhiteAt(string file, double t)
