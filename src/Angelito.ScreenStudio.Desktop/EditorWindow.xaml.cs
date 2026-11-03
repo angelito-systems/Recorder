@@ -50,6 +50,7 @@ public partial class EditorWindow : Window
         _cursor = _m.LoadCursor(_sessionDir);
         _clicks = _cursor.Where(c => c.K != CursorKind.Move).ToList();
         _duration = Math.Max(P.Segments.Max(s => s.End), 0.1);
+        _view = TimelineView.Fit(_duration);
         Stage.Width = ZoomHost.Width = ScreenMedia.Width = _m.Width;
         Stage.Height = ZoomHost.Height = ScreenMedia.Height = _m.Height;
 
@@ -66,6 +67,7 @@ public partial class EditorWindow : Window
         ScreenMedia.MediaOpened += (_, _) =>
         {
             if (ScreenMedia.NaturalDuration.HasTimeSpan) _duration = Math.Max(ScreenMedia.NaturalDuration.TimeSpan.TotalSeconds, P.Segments.Max(s => s.End));
+            _view = TimelineView.Fit(_duration);
             Seek(P.Segments[0].Start);
             DrawTimeline();
         };
@@ -237,7 +239,10 @@ public partial class EditorWindow : Window
         ApplyAnnotations(t);
         TimeText.Text = $"{Fmt(t)} / {Fmt(_duration)}";
         var w = Timeline.ActualWidth;
-        _playhead.X1 = _playhead.X2 = t / _duration * w;
+        // Follow only while playing, so scrolling away by hand doesn't snap back.
+        if (_playing && _drag == null && !_scrubbing && _view.Follow(t, _duration) is var f && f != _view) { _view = f; DrawTimeline(); }
+        _playhead.X1 = _playhead.X2 = _view.ToX(t, w);
+        _playhead.Visibility = t >= _view.Start && t <= _view.End ? Visibility.Visible : Visibility.Hidden;
         _playhead.Y1 = 0;
         _playhead.Y2 = Timeline.ActualHeight;
     }
@@ -300,18 +305,34 @@ public partial class EditorWindow : Window
 
     private void OnTimelineResize(object sender, SizeChangedEventArgs e) => DrawTimeline();
 
+    private TimelineView _view = TimelineView.Fit(1);
+
+    /// <summary>On-screen span of [s, e], clamped to the visible area (deep zoom would otherwise create million-pixel elements).</summary>
+    private (double X, double W)? Span(double s, double e)
+    {
+        var w = Timeline.ActualWidth;
+        double x0 = _view.ToX(s, w), x1 = _view.ToX(e, w);
+        if (x1 < -2 || x0 > w + 2) return null;
+        x0 = Math.Max(x0, -8);
+        x1 = Math.Min(x1, w + 8);
+        return (x0, Math.Max(2, x1 - x0));
+    }
+
     private void DrawTimeline()
     {
         if (_m == null || Timeline.ActualWidth <= 0) return;
         var w = Timeline.ActualWidth;
-        double X(double t) => t / _duration * w;
+        _view = _view.Clamped(_duration);
+        double X(double t) => _view.ToX(t, w);
         Timeline.Children.Clear();
 
-        var step = new[] { 1, 2, 5, 10, 15, 30, 60, 120, 300, 600 }.FirstOrDefault(s => w / (_duration / s) >= 70, 1200);
-        for (var t = 0.0; t <= _duration; t += step)
+        // Ruler: the smallest step that keeps labels ≥ 70 px apart.
+        var step = new[] { 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600 }.FirstOrDefault(s => s / _view.Length * w >= 70, 1200);
+        for (var n = (long)Math.Floor(_view.Start / step); n * step <= _view.End; n++) // integer steps: no float drift in labels
         {
+            var t = Math.Round(n * step, 3);
             Timeline.Children.Add(new Line { X1 = X(t), X2 = X(t), Y1 = 0, Y2 = 6, Stroke = Brushes.Gray });
-            var lbl = new TextBlock { Text = Fmt(t, false), Foreground = Brushes.Gray, FontSize = 10 };
+            var lbl = new TextBlock { Text = step < 1 ? TimeSpan.FromSeconds(t).ToString(@"m\:ss\.f") : Fmt(t, false), Foreground = Brushes.Gray, FontSize = 10 };
             Canvas.SetLeft(lbl, X(t) + 3);
             Timeline.Children.Add(lbl);
         }
@@ -320,14 +341,15 @@ public partial class EditorWindow : Window
         for (var i = 0; i < P.Segments.Count; i++)
         {
             var s = P.Segments[i];
+            if (Span(s.Start, s.End) is not { } sp) continue;
             var r = new Border
             {
-                Width = Math.Max(2, X(s.End) - X(s.Start) - 2), Height = SegH, CornerRadius = new CornerRadius(5),
+                Width = Math.Max(2, sp.W - 2), Height = SegH, CornerRadius = new CornerRadius(5),
                 Background = new SolidColorBrush(Color.FromRgb(0x3A, 0x33, 0x66)), BorderBrush = brand, BorderThickness = new Thickness(1),
-                Child = ClipContent(s, $"Clip {i + 1} · {Fmt(s.Duration, false)}", Math.Max(2, X(s.End) - X(s.Start) - 2)),
+                Child = ClipContent(s, $"Clip {i + 1} · {Fmt(s.Duration, false)}", X(s.Start) + 1, sp.X + 1, Math.Max(2, sp.W - 2)),
                 IsHitTestVisible = false, ClipToBounds = true,
             };
-            Canvas.SetLeft(r, X(s.Start) + 1);
+            Canvas.SetLeft(r, sp.X + 1);
             Canvas.SetTop(r, SegTop);
             Timeline.Children.Add(r);
         }
@@ -335,27 +357,28 @@ public partial class EditorWindow : Window
         for (var i = 0; i < P.Zooms.Count; i++)
         {
             var z = P.Zooms[i];
+            if (Span(z.Start, z.End) is not { } sp) continue;
             var sel = i == _selectedZoom;
             var r = new Border
             {
-                Width = Math.Max(4, X(z.End) - X(z.Start)), Height = ZoomH, CornerRadius = new CornerRadius(5),
+                Width = Math.Max(4, sp.W), Height = ZoomH, CornerRadius = new CornerRadius(5),
                 Background = new SolidColorBrush(sel ? Color.FromRgb(0x7C, 0x5C, 0xFA) : Color.FromRgb(0x2D, 0x4E, 0xC9)),
                 BorderBrush = sel ? Brushes.White : null, BorderThickness = new Thickness(sel ? 1.5 : 0),
                 Child = new TextBlock { Text = $"Zoom {z.Scale:0.0}×", Foreground = Brushes.White, FontSize = 11, Margin = new Thickness(6, 7, 0, 0) },
                 IsHitTestVisible = false,
             };
-            Canvas.SetLeft(r, X(z.Start));
+            Canvas.SetLeft(r, sp.X);
             Canvas.SetTop(r, ZoomTop);
             Timeline.Children.Add(r);
         }
 
-        DrawTextRows(X);
-        DrawAnnotationRow(X);
-        DrawAudioRow(X);
+        DrawTextRows();
+        DrawAnnotationRow();
+        DrawAudioRow();
 
         foreach (var c in _clicks)
-            Timeline.Children.Add(new Line { X1 = X(c.T), X2 = X(c.T), Y1 = ClickTop, Y2 = ClickTop + 10, Stroke = Brushes.Goldenrod, StrokeThickness = 1 });
-
+            if (c.T >= _view.Start && c.T <= _view.End)
+                Timeline.Children.Add(new Line { X1 = X(c.T), X2 = X(c.T), Y1 = ClickTop, Y2 = ClickTop + 10, Stroke = Brushes.Goldenrod, StrokeThickness = 1 });
         Timeline.Children.Add(_playhead);
         ApplyVisuals(Now);
     }
@@ -506,8 +529,11 @@ public partial class EditorWindow : Window
             case Key.Delete: OnDeleteSegment(this, e); break;
             case Key.Z when ctrl: OnUndo(this, e); break;
             case Key.Y when ctrl: OnRedo(this, e); break;
-            case Key.Left: Seek(Now - frame); break;
-            case Key.Right: Seek(Now + frame); break;
+            case Key.Left: Seek(Now - frame); RevealPlayhead(); break;
+            case Key.Right: Seek(Now + frame); RevealPlayhead(); break;
+            case Key.OemPlus or Key.Add when ctrl: ZoomTimeline(1.5); break;
+            case Key.OemMinus or Key.Subtract when ctrl: ZoomTimeline(1 / 1.5); break;
+            case Key.D0 or Key.NumPad0 when ctrl: OnFitTimeline(this, e); break;
             default: return;
         }
         e.Handled = true;

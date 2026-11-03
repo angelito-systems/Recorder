@@ -79,21 +79,22 @@ public partial class EditorWindow
             ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void DrawAnnotationRow(Func<double, double> x)
+    private void DrawAnnotationRow()
     {
         for (var i = 0; i < P.Annotations.Count; i++)
         {
             var a = P.Annotations[i];
+            if (Span(a.Start, a.End) is not { } sp) continue;
             var sel = i == _selectedAnn;
             var r = new Border
             {
-                Width = Math.Max(4, x(a.End) - x(a.Start)), Height = RowH, CornerRadius = new CornerRadius(4),
+                Width = Math.Max(4, sp.W), Height = RowH, CornerRadius = new CornerRadius(4),
                 Background = new SolidColorBrush(a.IsMask ? Color.FromRgb(0x47, 0x55, 0x69) : Color.FromRgb(0xB9, 0x1C, 0x1C)),
                 BorderBrush = sel ? Brushes.White : null, BorderThickness = new Thickness(sel ? 1.5 : 0),
                 Child = new TextBlock { Text = KindName(a.Kind), Foreground = Brushes.White, FontSize = 10, Margin = new Thickness(5, 3, 2, 0), TextTrimming = TextTrimming.CharacterEllipsis },
                 IsHitTestVisible = false,
             };
-            Canvas.SetLeft(r, x(a.Start));
+            Canvas.SetLeft(r, sp.X);
             Canvas.SetTop(r, AnnTop);
             Timeline.Children.Add(r);
         }

@@ -43,22 +43,27 @@ public partial class EditorWindow
         catch (Exception ex) { App.Log("media cache: " + ex.Message); }
     });
 
-    /// <summary>Clip block content: a strip of thumbnails filling the block, with the label on top.</summary>
-    private UIElement ClipContent(Segment s, string label, double widthPx)
+    /// <summary>
+    /// Clip block content: thumbnails tiled from the clip's true start (so they don't slide while scrolling), created only
+    /// for the visible part [visX, visX + visW]; the label sits at the visible left edge.
+    /// </summary>
+    private UIElement ClipContent(Segment s, string label, double clipX, double visX, double visW)
     {
         var g = new Grid();
         if (_thumbDir != null && _thumbCount > 0 && _m.Height > 0)
         {
             var strip = new Canvas { ClipToBounds = true, Opacity = 0.75 };
             var tw = (SegH - 2) * _m.Width / (double)_m.Height;
-            var secPerPx = s.Duration / Math.Max(1, widthPx);
-            for (double x = 0; x < widthPx; x += tw) // only as many as fit: the strip is virtualized by width
+            var secPerPx = _view.Length / Math.Max(1, Timeline.ActualWidth);
+            var first = Math.Max(0, (int)Math.Floor((visX - clipX) / tw));
+            for (var k = first; clipX + k * tw < visX + visW; k++)
             {
-                var t = s.Start + (x + tw / 2) * secPerPx;
+                var t = s.Start + (k * tw + tw / 2) * secPerPx;
+                if (t > s.End) break;
                 var bmp = Thumb(Math.Clamp((int)(t / _thumbInterval), 0, _thumbCount - 1));
                 if (bmp == null) continue;
                 var img = new Image { Source = bmp, Width = tw, Height = SegH - 2, Stretch = Stretch.UniformToFill };
-                Canvas.SetLeft(img, x);
+                Canvas.SetLeft(img, clipX + k * tw - visX);
                 strip.Children.Add(img);
             }
             g.Children.Add(strip);
@@ -96,7 +101,7 @@ public partial class EditorWindow
         return bmp;
     }
 
-    private void DrawAudioRow(Func<double, double> x)
+    private void DrawAudioRow()
     {
         var w = Timeline.ActualWidth;
         void Wave(byte[]? peaks, double delay, bool muted, Color color)
@@ -109,8 +114,9 @@ public partial class EditorWindow
                 for (var c = 0; c < (int)w; c++)
                 {
                     // Peaks covering this pixel column, shifted onto screen time like the player and exporter do.
-                    double t0 = c / w * _duration - delay, t1 = (c + 1) / w * _duration - delay;
-                    int i0 = Math.Max(0, (int)(t0 * MediaCache.PeaksPerSecond)), i1 = Math.Min(peaks.Length, (int)Math.Ceiling(t1 * MediaCache.PeaksPerSecond));
+                    double t0 = _view.ToTime(c, w) - delay, t1 = _view.ToTime(c + 1, w) - delay;
+                    var i0 = Math.Max(0, (int)(t0 * MediaCache.PeaksPerSecond));
+                    var i1 = Math.Min(peaks.Length, Math.Max(i0 + 1, (int)Math.Ceiling(t1 * MediaCache.PeaksPerSecond))); // deep zoom: ≥1 bin per column
                     var max = 0;
                     for (var i = i0; i < i1; i++) max = Math.Max(max, peaks[i]);
                     if (max == 0) continue;

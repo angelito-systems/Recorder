@@ -17,7 +17,8 @@ public partial class EditorWindow
     private const double EdgePx = 6, MinLen = 0.2;
     private DragState? _drag;
 
-    private double PxToTime => _duration / Math.Max(1, Timeline.ActualWidth);
+    private double PxToTime => _view.Length / Math.Max(1, Timeline.ActualWidth);
+    private double TimeAt(double x) => _view.ToTime(x, Timeline.ActualWidth);
 
     private IReadOnlyList<(double S, double E)> Items(Row r) => r switch
     {
@@ -59,10 +60,9 @@ public partial class EditorWindow
     {
         if (RowAt(p.Y) is not { } row) return null;
         var items = Items(row);
-        var k = 1 / PxToTime;
         for (var i = items.Count - 1; i >= 0; i--) // topmost (last drawn) first
         {
-            double xs = items[i].S * k, xe = items[i].E * k;
+            double xs = _view.ToX(items[i].S, Timeline.ActualWidth), xe = _view.ToX(items[i].E, Timeline.ActualWidth);
             if (p.X < xs - EdgePx || p.X > xe + EdgePx) continue;
             var wide = xe - xs > 3 * EdgePx; // tiny blocks: the whole block moves
             if (wide && Math.Abs(p.X - xs) <= EdgePx) return (row, i, DragMode.Start);
@@ -107,7 +107,7 @@ public partial class EditorWindow
         }
         else if (hit is { Row: not Row.Segment }) Select();
         _scrubbing = true;
-        Seek(pos.X * PxToTime);
+        Seek(TimeAt(pos.X));
     }
 
     private void OnTimelineMove(object sender, MouseEventArgs e)
@@ -124,7 +124,7 @@ public partial class EditorWindow
             if (d.Mode != DragMode.Move) Seek(d.Mode == DragMode.Start ? s : en); // show the frame at the edge being trimmed
             return;
         }
-        if (_scrubbing) { Seek(pos.X * PxToTime); return; }
+        if (_scrubbing) { Seek(TimeAt(pos.X)); return; }
         Timeline.Cursor = HitTest(pos) switch
         {
             { Mode: DragMode.Start or DragMode.End } => Cursors.SizeWE,
@@ -133,9 +133,37 @@ public partial class EditorWindow
         };
     }
 
+    private void OnTimelineWheel(object sender, MouseWheelEventArgs e)
+    {
+        var steps = e.Delta / 120.0;
+        _view = Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
+            ? _view.ZoomAt(TimeAt(e.GetPosition(Timeline).X), Math.Pow(1.25, steps), _duration)
+            : _view.ScrollBy(-steps * _view.Length * 0.15, _duration);
+        DrawTimeline();
+        e.Handled = true;
+    }
+
+    /// <summary>Zooms around the playhead when it's visible, otherwise around the center.</summary>
+    private void ZoomTimeline(double factor)
+    {
+        var anchor = Now >= _view.Start && Now <= _view.End ? Now : _view.Start + _view.Length / 2;
+        _view = _view.ZoomAt(anchor, factor, _duration);
+        DrawTimeline();
+    }
+
+    private void RevealPlayhead()
+    {
+        var f = _view.Follow(Now, _duration);
+        if (f != _view) { _view = f; DrawTimeline(); }
+    }
+
+    private void OnZoomInTimeline(object sender, RoutedEventArgs e) => ZoomTimeline(1.5);
+    private void OnZoomOutTimeline(object sender, RoutedEventArgs e) => ZoomTimeline(1 / 1.5);
+    private void OnFitTimeline(object sender, RoutedEventArgs e) { _view = TimelineView.Fit(_duration); DrawTimeline(); }
+
     private void OnTimelineUp(object sender, MouseButtonEventArgs e)
     {
-        if (_drag is { Moved: false }) Seek(e.GetPosition(Timeline).X * PxToTime);
+        if (_drag is { Moved: false }) Seek(TimeAt(e.GetPosition(Timeline).X));
         _drag = null;
         _scrubbing = false;
         _lastEditKey = null;

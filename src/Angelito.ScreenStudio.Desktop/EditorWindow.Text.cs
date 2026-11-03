@@ -148,18 +148,19 @@ public partial class EditorWindow
         foreach (var (s, e, el) in _textEls) el.Visibility = t >= s && t <= e ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void DrawTextRows(Func<double, double> x)
+    private void DrawTextRows()
     {
         void Row(double top, double s, double e, string label, Color color, bool sel)
         {
+            if (Span(s, e) is not { } sp) return;
             var r = new Border
             {
-                Width = Math.Max(4, x(e) - x(s)), Height = RowH, CornerRadius = new CornerRadius(4),
+                Width = Math.Max(4, sp.W), Height = RowH, CornerRadius = new CornerRadius(4),
                 Background = new SolidColorBrush(color), BorderBrush = sel ? Brushes.White : null, BorderThickness = new Thickness(sel ? 1.5 : 0),
                 Child = new TextBlock { Text = label.Replace('\n', ' '), Foreground = Brushes.White, FontSize = 10, Margin = new Thickness(5, 3, 2, 0), TextTrimming = TextTrimming.CharacterEllipsis },
                 IsHitTestVisible = false,
             };
-            Canvas.SetLeft(r, x(s));
+            Canvas.SetLeft(r, sp.X);
             Canvas.SetTop(r, top);
             Timeline.Children.Add(r);
         }

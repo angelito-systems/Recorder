@@ -259,12 +259,15 @@
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
                 <Button x:Name="PlayBtn" Content="▶" Width="44" Click="OnPlay" ToolTip="Reproducir / pausar (Espacio)"/>
                 <TextBlock x:Name="TimeText" VerticalAlignment="Center" Margin="12,0" FontFamily="Cascadia Mono, Consolas"/>
+                <Button Content="−" Width="32" Click="OnZoomOutTimeline" ToolTip="Alejar línea de tiempo (Ctrl+−, Ctrl+rueda)"/>
+                <Button Content="+" Width="32" Click="OnZoomInTimeline" Margin="4,0,0,0" ToolTip="Acercar línea de tiempo (Ctrl++, Ctrl+rueda)"/>
+                <Button Content="Ajustar" Click="OnFitTimeline" Margin="4,0,12,0" ToolTip="Ver toda la grabación (Ctrl+0)"/>
                 <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" HorizontalAlignment="Right"
-                           Text="Filas: clips · zoom · texto · subtítulos · anotaciones · audio · clics    Espacio: reproducir · S: dividir · Supr: eliminar tramo · ←/→: fotograma · Ctrl+Z/Y"/>
+                           Text="Filas: clips · zoom · texto · subtítulos · anotaciones · audio · clics    Rueda: desplazar · Espacio: reproducir · S: dividir · Supr: eliminar tramo · ←/→: fotograma · Ctrl+Z/Y"/>
             </DockPanel>
             <Border CornerRadius="6" Background="#14141B" ClipToBounds="True">
                 <Canvas x:Name="Timeline" Background="Transparent" SizeChanged="OnTimelineResize"
-                        MouseLeftButtonDown="OnTimelineDown" MouseMove="OnTimelineMove" MouseLeftButtonUp="OnTimelineUp"/>
+                        MouseLeftButtonDown="OnTimelineDown" MouseMove="OnTimelineMove" MouseLeftButtonUp="OnTimelineUp" MouseWheel="OnTimelineWheel"/>
             </Border>
         </DockPanel>
     </Grid>

@@ -140,6 +140,40 @@ public class MediaCacheTests
     }
 }
 
+public class TimelineViewTests
+{
+    [Fact]
+    public void ZoomKeepsAnchorUnderCursor()
+    {
+        var v = TimelineView.Fit(100).ZoomAt(25, 4, 100);
+        Assert.Equal(25, v.Length, 6);
+        Assert.Equal(0.25, (25 - v.Start) / v.Length, 6); // anchor stays at 25% of the width
+        Assert.Equal(25, v.ToTime(v.ToX(25, 800), 800), 6);
+    }
+
+    [Fact]
+    public void StaysInsideDurationAndLimits()
+    {
+        var v = TimelineView.Fit(100);
+        Assert.Equal(TimelineView.Fit(100), v.ZoomAt(50, 0.1, 100)); // can't zoom out past the whole clip
+        Assert.Equal(TimelineView.MinLength, v.ZoomAt(99.9, 1e6, 100).Length, 6);
+        var deep = v.ZoomAt(99.9, 1e6, 100);
+        Assert.True(deep.End <= 100 && deep.Start <= 99.9 && deep.End >= 99.9); // anchor visible, never past the end
+        Assert.Equal(100, new TimelineView(95, 10).Clamped(100).End, 6);
+        Assert.Equal(90, new TimelineView(0, 10).ScrollBy(500, 100).Start, 6);
+        Assert.Equal(0, new TimelineView(5, 10).ScrollBy(-50, 100).Start, 6);
+    }
+
+    [Fact]
+    public void FollowPagesOnlyWhenOutside()
+    {
+        var v = new TimelineView(10, 10);
+        Assert.Equal(v, v.Follow(15, 100));
+        Assert.Equal(24, v.Follow(25, 100).Start, 6);
+        Assert.Equal(0, v.Follow(0.5, 100).Start, 6);
+    }
+}
+
 public class TimeMappingTests
 {
     // Source 0-10 with 4-6 removed: output is 8 s long.
