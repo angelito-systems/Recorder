@@ -9,8 +9,19 @@ public sealed record Segment(double Start, double End)
     [JsonIgnore] public double Duration => End - Start;
 }
 
-/// <summary>X/Y are the zoom center normalized to 0..1 of the source frame. Ramp is ease-in/out time in seconds.</summary>
-public sealed record ZoomSegment(double Start, double End, double Scale, double X, double Y, double Ramp = 0.6);
+/// <summary>
+/// X/Y are the zoom center normalized to 0..1 of the source frame. Ramp is the ease-in time in seconds; RampOut the
+/// ease-out time (negative = same as Ramp, which is how projects saved before it existed read). Auto marks zooms made
+/// by <see cref="AutoZoom"/>, so regenerating replaces only those and keeps the user's own.
+/// </summary>
+public sealed record ZoomSegment(double Start, double End, double Scale, double X, double Y, double Ramp = 0.6, double RampOut = -1, bool Auto = false);
+
+/// <summary>
+/// Auto-zoom tuning (Efectos → Zoom). Times in seconds. IdleReturn: inactivity after the last click before zooming
+/// back out. Follow: a click elsewhere while zoomed pans there instead of zooming out and in again.
+/// </summary>
+public sealed record AutoZoomSettings(bool Enabled = true, double Scale = 1.5, double ZoomIn = 0.45, double MinHold = 1.2,
+    double IdleReturn = 2.0, double ZoomOut = 0.6, bool Follow = true);
 
 public sealed record CursorStyle(bool ShowClicks = true, string Color = "#8B5CF6", int Size = 56, double Duration = 0.5);
 
@@ -101,6 +112,7 @@ public sealed record StudioProject
     public string SessionDir { get; init; } = ".";
     public List<Segment> Segments { get; init; } = [];
     public List<ZoomSegment> Zooms { get; init; } = [];
+    public AutoZoomSettings AutoZoom { get; init; } = new();
     public CursorStyle Cursor { get; init; } = new();
     public WebcamLayout Webcam { get; init; } = new();
     public AudioMix Audio { get; init; } = new();
@@ -114,7 +126,7 @@ public sealed record StudioProject
     public static StudioProject FromSession(double duration, IReadOnlyList<CursorEvent> cursor, int width, int height) => new()
     {
         Segments = [new Segment(0, duration)],
-        Zooms = AutoZoom.Propose(cursor, width, height, duration),
+        Zooms = Core.AutoZoom.Propose(cursor, width, height, duration),
     };
 
     public string ToJson() => JsonSerializer.Serialize(this, SessionManifest.Json);
