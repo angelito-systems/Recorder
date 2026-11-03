@@ -1,0 +1,121 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using Angelito.ScreenStudio.Core;
+
+namespace Angelito.ScreenStudio.Desktop;
+
+public enum JobState { Queued, Running, Done, Failed, Canceled }
+
+/// <summary>
+/// One export. It holds an immutable snapshot of the project taken when it was queued, so editing continues freely.
+/// Annotation PNGs are rendered at queue time (they need the UI thread) into the job's own temp folder.
+/// </summary>
+public sealed class RenderJob : INotifyPropertyChanged
+{
+    public required StudioProject Project { get; init; }
+    public required SessionManifest Manifest { get; init; }
+    public required string SessionDir { get; init; }
+    public required IReadOnlyList<CursorEvent> Cursor { get; init; }
+    public required string OutputPath { get; init; }
+    public required string TempDir { get; init; }
+    public required Dictionary<int, (string Png, int X, int Y)> AnnotationImages { get; init; }
+    public CancellationTokenSource Cts { get; } = new();
+
+    public string Name => Path.GetFileName(OutputPath);
+    public string Details { get; init; } = "";
+
+    private JobState _state;
+    public JobState State { get => _state; set { _state = value; Changed(); Changed(nameof(StatusText)); Changed(nameof(IsActive)); Changed(nameof(IsDone)); } }
+    private double _progress;
+    public double Progress { get => _progress; set { _progress = value; Changed(); Changed(nameof(StatusText)); } }
+    private string? _error;
+    public string? Error { get => _error; set { _error = value; Changed(); Changed(nameof(StatusText)); } }
+    public string Encoder { get; set; } = "";
+
+    public bool IsActive => State is JobState.Queued or JobState.Running;
+    public bool IsDone => State == JobState.Done;
+    public string StatusText => State switch
+    {
+        JobState.Queued => "En cola",
+        JobState.Running => $"Exportando {Progress:P0}{(Encoder != "" ? " · " + Encoder : "")}",
+        JobState.Done => $"Listo · {Encoder}",
+        JobState.Failed => "Error: " + Error,
+        _ => "Cancelado",
+    };
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void Changed([CallerMemberName] string? n = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
+}
+
+/// <summary>App-wide queue: jobs run one at a time (encoders and disk don't benefit from running several at once).</summary>
+public static class RenderQueue
+{
+    public static ObservableCollection<RenderJob> Jobs { get; } = [];
+    private static readonly Dictionary<bool, Task<EncoderChoice>> s_encoders = [];
+    private static bool s_running;
+
+    public static bool Busy => Jobs.Any(j => j.IsActive);
+
+    public static void Enqueue(RenderJob job)
+    {
+        Jobs.Add(job);
+        if (!s_running) _ = RunAsync();
+    }
+
+    public static void Cancel(RenderJob job)
+    {
+        job.Cts.Cancel();
+        if (job.State == JobState.Queued) { job.State = JobState.Canceled; Cleanup(job); }
+    }
+
+    private static async Task RunAsync()
+    {
+        s_running = true;
+        try
+        {
+            while (Jobs.FirstOrDefault(j => j.State == JobState.Queued) is { } job) await RunJob(job);
+        }
+        finally { s_running = false; }
+    }
+
+    private static async Task RunJob(RenderJob job)
+    {
+        job.State = JobState.Running;
+        // ffmpeg picks the muxer from the extension, so the partial file keeps it; it's renamed only on success.
+        var part = Path.Combine(Path.GetDirectoryName(job.OutputPath)!, Path.GetFileNameWithoutExtension(job.OutputPath) + ".part" + Path.GetExtension(job.OutputPath));
+        try
+        {
+            var hevc = job.Project.Export.Format == ExportFormat.Mp4Hevc;
+            if (!s_encoders.TryGetValue(hevc, out var probe)) s_encoders[hevc] = probe = EncoderProbe.ForExportAsync(hevc);
+            var enc = await probe;
+            job.Encoder = job.Project.Export.Format switch { ExportFormat.Wav => "PCM", ExportFormat.Png => "PNG", _ => enc.Name };
+            var graph = Path.Combine(job.TempDir, "export.graph");
+            var plan = Exporter.Build(job.Project, job.Manifest, job.SessionDir, job.Cursor, enc, part, graph,
+                i => job.AnnotationImages.TryGetValue(i, out var v) ? v : null);
+            var ui = Application.Current.Dispatcher;
+            await Exporter.RunAsync(plan, graph, v => ui.BeginInvoke(() => job.Progress = v), job.Cts.Token);
+            File.Move(part, job.OutputPath, overwrite: true);
+            job.Progress = 1;
+            job.State = JobState.Done;
+        }
+        catch (OperationCanceledException) { TryDelete(part); job.State = JobState.Canceled; }
+        catch (Exception ex)
+        {
+            TryDelete(part);
+            App.Log($"export {job.Name}: {ex}");
+            job.Error = ex.Message.Split('\n')[0];
+            job.State = JobState.Failed;
+        }
+        finally { Cleanup(job); }
+    }
+
+    private static void Cleanup(RenderJob job)
+    {
+        try { if (Directory.Exists(job.TempDir)) Directory.Delete(job.TempDir, true); } catch (IOException) { }
+    }
+
+    private static void TryDelete(string f) { try { File.Delete(f); } catch (IOException) { } }
+}

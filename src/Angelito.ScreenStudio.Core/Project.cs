@@ -75,10 +75,16 @@ public sealed record ProjectCanvas(CanvasAspect Aspect = CanvasAspect.Source, do
     }
 }
 
-public enum ExportQuality { Fast, Balanced, High }
+public enum ExportQuality { Fast, Balanced, High, Max }
+
+public enum ExportFormat { Mp4H264, Mp4Hevc, MkvH264, Wav, Png }
 
 /// <summary>Height is the short side of the output in pixels; 0 keeps the canvas window's own pixel size.</summary>
-public sealed record ExportSettings(int Height = 0, ExportQuality Quality = ExportQuality.Balanced);
+/// <summary>Fps 0 keeps the recording's rate.</summary>
+public sealed record ExportSettings(int Height = 0, ExportQuality Quality = ExportQuality.Balanced, ExportFormat Format = ExportFormat.Mp4H264, int Fps = 0)
+{
+    public string Extension => Format switch { ExportFormat.MkvH264 => ".mkv", ExportFormat.Wav => ".wav", ExportFormat.Png => ".png", _ => ".mp4" };
+}
 
 /// <summary>.angelstudio file. Immutable records: every edit produces a new value, which makes undo a stack of values.</summary>
 public sealed record StudioProject
@@ -171,6 +177,13 @@ public sealed record StudioProject
     /// <summary>Replaces subtitles with an SRT written against the exported video's timing.</summary>
     public StudioProject ImportSrt(string srt) =>
         this with { Subtitles = Srt.Parse(srt).Select(c => new Cue(ToSource(c.Start), ToSource(c.End), c.Text)).Where(c => c.End > c.Start).ToList() };
+
+    /// <summary>The project reduced to the single frame at source time t, for a PNG still through the full pipeline.</summary>
+    public StudioProject StillAt(double t, int fps) => this with
+    {
+        Segments = [new Segment(t, t + 1.5 / fps)],
+        Export = Export with { Format = ExportFormat.Png },
+    };
 
     /// <summary>Splits the segment containing t. No-op if t is at an edge or in a removed range.</summary>
     public StudioProject SplitAt(double t)

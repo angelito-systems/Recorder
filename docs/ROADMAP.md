@@ -13,7 +13,8 @@ Estado verificado el 2026-11-03 en i7-13650HX / RTX 4050 Laptop / Intel UHD, Win
 - Timeline: arrastrar zooms, textos y subtítulos para moverlos; arrastrar sus bordes y los de los clips para ajustar/recortar; imán al cabezal y a todos los bordes (Alt lo desactiva); sin solapes entre clips, zooms o subtítulos vecinos; cada arrastre es un único paso de deshacer. Verificado con arrastres reales del ratón.
 - Anotaciones: flecha, rectángulo, círculo, resaltado, desenfoque y pixelado; mover y redimensionar en la vista previa (siguen al zoom), color, grosor, tiempos y fila en el timeline. Las formas vectoriales se exportan desde el mismo dibujo WPF de la vista previa (PNG), así que coinciden exactamente. Desenfoque de fuerza independiente del tamaño; pruebas de privacidad con PSNR (zona tapada cambia, resto intacto; texto pequeño ilegible).
 - Textos y subtítulos: añadir/quitar, editar contenido multilínea, tamaño, color, fondo, negrita, inicio/fin, arrastrar en la vista previa; subtítulos con estilo común, importar/exportar SRT con tiempos ajustados a los cortes, incrustación opcional. La vista previa y el render usan la misma fuente (Segoe UI) y la misma geometría; verificado comparando una captura del editor con un fotograma exportado.
-- Exportación MP4 H.264/AAC (original, 4K, 1440p, 1080p, 720p; 3 calidades) con progreso y cancelación, NVENC/QSV/AMF/x264. Real: 6,2 s 1080p exportados en 1,2 s con NVENC.
+- Exportación: MP4 H.264, MP4 HEVC/H.265 (etiqueta hvc1), MKV H.264, WAV (solo audio, sin decodificar video) y PNG (fotograma del cabezal, mismo pipeline). Resolución, 4 calidades, FPS de salida, presets (Rápido, Equilibrado, Alta, Máxima, YouTube 4K, Redes sociales 9:16) y tamaño estimado (aproximado: la codificación es por calidad). Codificador detectado por hardware para H.264 y HEVC (NVENC/QSV/AMF, CPU x264/x265). Cola de exportación: trabajos secuenciales con copia fija del proyecto, progreso, cancelación, errores visibles y registrados; se puede seguir editando. Verificado: HEVC (NVENC) + WAV + PNG encolados desde la app.
+- No hay reanudación de trabajos interrumpidos (no existe un diseño de checkpoints; un trabajo cancelado se repite completo). La cola no persiste al cerrar la app.
 - 11 pruebas automáticas (zoom, auto-zoom, proyecto, historial, recuperación de `.bak`, formato de cursor, layout, exportación FFmpeg real con cortes+zoom+clics+webcam+audio).
 
 ## Pendiente, por prioridad
@@ -25,7 +26,7 @@ Estado verificado el 2026-11-03 en i7-13650HX / RTX 4050 Laptop / Intel UHD, Win
 5. Visualizador de atajos con **lista positiva** de combinaciones y exclusión por aplicación (hook de teclado solo con modificadores).
 6. Cursor ampliado/suavizado en posproducción (requiere grabar sin cursor y dibujarlo, `draw_mouse=0` + `sendcmd`).
 7. Compositor GPU propio (D3D11) para vista previa y exportación a la vez (hoy la cámara usa `perspective` en CPU: ~230 fps a 1080p).
-8. MKV/HEVC/WAV/PNG en exportación; cola de render; seguimiento automático del cursor como propuesta de encuadre.
+8. AV1 (av1_nvenc/qsv/amf existen en esta compilación; falta validar compatibilidad de reproducción); seguimiento automático del cursor como propuesta de encuadre.
 9. Instalador (MSIX o WiX), icono, firma de código, actualizaciones firmadas.
 10. Multimonitor: el emparejamiento salida DXGI ↔ monitor es por tamaño y orden; **no verificado** con varios monitores (este equipo tiene uno).
 

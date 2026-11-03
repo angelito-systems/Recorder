@@ -177,16 +177,13 @@ public partial class EditorWindow
     private void OnAnnStartHere(object sender, RoutedEventArgs e) { var n = Now; EditAnn(a => a with { Start = n }, "as" + Guid.NewGuid()); }
     private void OnAnnEndHere(object sender, RoutedEventArgs e) { var n = Now; EditAnn(a => a with { End = n }, "ae" + Guid.NewGuid()); }
 
-    /// <summary>Renders vector annotations to PNGs for the exporter; returns the lookup and the files to clean up.</summary>
-    private (Func<int, (string, int, int)?> Lookup, List<string> Files) RenderAnnotationImages()
+    /// <summary>Renders vector annotations to PNGs (in <paramref name="dir"/>) for the exporter, keyed by annotation index.</summary>
+    private Dictionary<int, (string Png, int X, int Y)> RenderAnnotationImages(string dir)
     {
         var map = new Dictionary<int, (string, int, int)>();
         for (var i = 0; i < P.Annotations.Count; i++)
-        {
-            if (P.Annotations[i].IsMask) continue;
-            var path = System.IO.Path.Combine(App.DataDir, $"export-{Environment.ProcessId}.ann{i}.png");
-            map[i] = AnnotationVisual.RenderPng(P.Annotations[i], _m.Width, _m.Height, path);
-        }
-        return (i => map.TryGetValue(i, out var v) ? v : null, map.Values.Select(v => v.Item1).ToList());
+            if (!P.Annotations[i].IsMask)
+                map[i] = AnnotationVisual.RenderPng(P.Annotations[i], _m.Width, _m.Height, System.IO.Path.Combine(dir, $"ann{i}.png"));
+        return map;
     }
 }

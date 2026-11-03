@@ -16,8 +16,6 @@ namespace Angelito.ScreenStudio.Desktop;
 /// </summary>
 public partial class EditorWindow : Window
 {
-    private static Task<EncoderChoice>? s_exportEncoder;
-
     private readonly string _path;
     private readonly History _history;
     private SessionManifest _m = null!;
@@ -30,7 +28,6 @@ public partial class EditorWindow : Window
     private int _selectedZoom = -1;
     private string? _lastEditKey;
     private DateTime _lastEditAt;
-    private CancellationTokenSource? _exportCts;
     private readonly DispatcherTimer _autosave = new() { Interval = TimeSpan.FromSeconds(20) };
     private readonly List<Ellipse> _rings = [];
     private readonly Line _playhead = new() { Stroke = Brushes.White, StrokeThickness = 2, IsHitTestVisible = false };
@@ -163,8 +160,17 @@ public partial class EditorWindow : Window
 
         ExportHeight.SelectedIndex = Math.Max(0, ExportHeight.Items.Cast<ComboBoxItem>().ToList().FindIndex(i => (string)i.Tag == p.Export.Height.ToString()));
         ExportQualityBox.SelectedIndex = (int)p.Export.Quality;
+        ExportFormatBox.SelectedIndex = (int)p.Export.Format;
+        ExportFpsBox.SelectedIndex = Math.Max(0, ExportFpsBox.Items.Cast<ComboBoxItem>().ToList().FindIndex(i => (string)i.Tag == p.Export.Fps.ToString()));
+        PresetBox.SelectedIndex = 0;
         var (ow, oh) = Layout.OutputSize(_m, p.Export, p.Canvas);
-        ExportInfo.Text = $"{ow}×{oh} · {_m.Fps} FPS · duración {Fmt(p.OutputDuration)} · H.264/AAC";
+        var size = Exporter.EstimateBytes(p, _m) / 1048576.0;
+        ExportInfo.Text = p.Export.Format switch
+        {
+            ExportFormat.Wav => $"Audio 48 kHz estéreo · {Fmt(p.OutputDuration)} · ≈{size:0.#} MB",
+            ExportFormat.Png => $"{ow}×{oh} · fotograma bajo el cabezal",
+            _ => $"{ow}×{oh} · {Exporter.Fps(p, _m)} FPS · {Fmt(p.OutputDuration)} · ≈{size:0.#} MB (aprox.)",
+        };
 
         UndoBtn.IsEnabled = _history.CanUndo;
         RedoBtn.IsEnabled = _history.CanRedo;
@@ -518,9 +524,32 @@ public partial class EditorWindow : Window
 
     private void OnExportEdit(object sender, RoutedEventArgs e)
     {
-        if (_refreshing || ExportHeight.SelectedItem is not ComboBoxItem h || ExportQualityBox.SelectedIndex < 0) return;
-        Commit(P with { Export = new ExportSettings(int.Parse((string)h.Tag), (ExportQuality)ExportQualityBox.SelectedIndex) }, "export" + Guid.NewGuid());
+        if (_refreshing || ExportHeight.SelectedItem is not ComboBoxItem h || ExportFpsBox.SelectedItem is not ComboBoxItem f
+            || ExportQualityBox.SelectedIndex < 0 || ExportFormatBox.SelectedIndex < 0) return;
+        Commit(P with
+        {
+            Export = new ExportSettings(int.Parse((string)h.Tag), (ExportQuality)ExportQualityBox.SelectedIndex, (ExportFormat)ExportFormatBox.SelectedIndex, int.Parse((string)f.Tag)),
+        }, "export" + Guid.NewGuid());
     }
+
+    /// <summary>Presets only fill in the settings; everything stays editable afterwards.</summary>
+    private void OnPreset(object sender, SelectionChangedEventArgs e)
+    {
+        if (_refreshing || PresetBox.SelectedIndex <= 0) return;
+        var ex = P.Export;
+        var next = PresetBox.SelectedIndex switch
+        {
+            1 => P with { Export = ex with { Format = ExportFormat.Mp4H264, Quality = ExportQuality.Fast } },
+            2 => P with { Export = ex with { Format = ExportFormat.Mp4H264, Quality = ExportQuality.Balanced } },
+            3 => P with { Export = ex with { Format = ExportFormat.Mp4H264, Quality = ExportQuality.High } },
+            4 => P with { Export = ex with { Format = ExportFormat.Mp4H264, Quality = ExportQuality.Max } },
+            5 => P with { Export = ex with { Format = ExportFormat.Mp4H264, Quality = ExportQuality.High, Height = 2160 } },
+            _ => P with { Canvas = P.Canvas with { Aspect = CanvasAspect.Vertical }, Export = ex with { Format = ExportFormat.Mp4H264, Quality = ExportQuality.Balanced, Height = 1080, Fps = 30 } },
+        };
+        Commit(next, "preset" + Guid.NewGuid());
+    }
+
+    private void OnShowQueue(object sender, RoutedEventArgs e) => RenderQueueWindow.ShowQueue();
 
     private void OnUndo(object sender, RoutedEventArgs e) { _history.Undo(); _lastEditKey = null; _dirty = true; Refresh(); }
     private void OnRedo(object sender, RoutedEventArgs e) { _history.Redo(); _lastEditKey = null; _dirty = true; Refresh(); }
@@ -574,12 +603,19 @@ public partial class EditorWindow : Window
         if (dlg.ShowDialog(this) == true) new EditorWindow(dlg.FileName).Show();
     }
 
-    private async void OnExport(object sender, RoutedEventArgs e)
+    /// <summary>Queues an export of the project as it is now. PNG exports the frame under the playhead.</summary>
+    private void OnExport(object sender, RoutedEventArgs e)
     {
+        var fmt = P.Export.Format;
         var dlg = new SaveFileDialog
         {
-            Filter = "Video MP4 (H.264)|*.mp4", FileName = ProjectName.Text + ".mp4",
-            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
+            Filter = fmt switch
+            {
+                ExportFormat.MkvH264 => "Video MKV (H.264)|*.mkv", ExportFormat.Mp4Hevc => "Video MP4 (HEVC/H.265)|*.mp4",
+                ExportFormat.Wav => "Audio WAV|*.wav", ExportFormat.Png => "Imagen PNG|*.png", _ => "Video MP4 (H.264)|*.mp4",
+            },
+            FileName = ProjectName.Text + (fmt == ExportFormat.Png ? $"-{Now:0.00}s" : "") + P.Export.Extension,
+            InitialDirectory = Environment.GetFolderPath(fmt == ExportFormat.Png ? Environment.SpecialFolder.MyPictures : Environment.SpecialFolder.MyVideos),
         };
         if (dlg.ShowDialog(this) != true) return;
         var media = new[] { _m.Screen, _m.Webcam, _m.Mic, _m.SystemAudio }.Where(f => f != null).Select(f => System.IO.Path.GetFullPath(System.IO.Path.Combine(_sessionDir, f!)));
@@ -588,45 +624,35 @@ public partial class EditorWindow : Window
             MessageBox.Show(this, "Elige otro nombre: no se sobrescriben los archivos originales.", App.Product);
             return;
         }
+        if (RenderQueue.Jobs.Any(j => j.IsActive && string.Equals(j.OutputPath, dlg.FileName, StringComparison.OrdinalIgnoreCase)))
+        {
+            MessageBox.Show(this, "Ya hay una exportación en cola hacia ese archivo.", App.Product);
+            return;
+        }
 
-        Pause();
         Save();
-        ExportBtn.IsEnabled = false;
-        ExportProgress.Value = 0;
-        ExportProgress.Visibility = CancelExportBtn.Visibility = Visibility.Visible;
-        _exportCts = new CancellationTokenSource();
-        var graph = System.IO.Path.Combine(App.DataDir, $"export-{Environment.ProcessId}.graph");
-        var tmp = dlg.FileName + ".part.mp4";
-        List<string> pngs = [];
-        try
+        var project = fmt == ExportFormat.Png ? P.StillAt(Now, Exporter.Fps(P, _m)) : P;
+        var temp = System.IO.Path.Combine(App.DataDir, "jobs", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temp);
+        var (ow, oh) = Layout.OutputSize(_m, project.Export, project.Canvas);
+        RenderQueue.Enqueue(new RenderJob
         {
-            s_exportEncoder ??= EncoderProbe.ForExportAsync();
-            var enc = await s_exportEncoder;
-            var (annImage, annFiles) = RenderAnnotationImages();
-            pngs = annFiles;
-            var plan = Exporter.Build(P, _m, _sessionDir, _cursor, enc, tmp, graph, annImage);
-            await Exporter.RunAsync(plan, graph, v => Dispatcher.BeginInvoke(() => ExportProgress.Value = v), _exportCts.Token);
-            File.Move(tmp, dlg.FileName, overwrite: true);
-            MessageBox.Show(this, $"Exportado con {enc.Name}:\n{dlg.FileName}", App.Product);
-        }
-        catch (OperationCanceledException) { TryDelete(tmp); }
-        catch (Exception ex)
-        {
-            TryDelete(tmp);
-            App.Log(ex.ToString());
-            MessageBox.Show(this, ex.Message, App.Product, MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            ExportBtn.IsEnabled = true;
-            ExportProgress.Visibility = CancelExportBtn.Visibility = Visibility.Collapsed;
-            TryDelete(graph);
-            pngs.ForEach(TryDelete);
-        }
+            Project = project, Manifest = _m, SessionDir = _sessionDir, Cursor = _cursor, OutputPath = dlg.FileName, TempDir = temp,
+            AnnotationImages = fmt == ExportFormat.Wav ? [] : RenderAnnotationImages(temp),
+            Details = fmt switch
+            {
+                ExportFormat.Wav => $"WAV · {Fmt(project.OutputDuration)}",
+                ExportFormat.Png => $"{ow}×{oh} · PNG · fotograma en {Fmt(Now)}",
+                _ => $"{ow}×{oh} · {FormatName(fmt)} · {Fmt(project.OutputDuration)}",
+            },
+        });
+        RenderQueueWindow.ShowQueue();
     }
 
-    private void OnCancelExport(object sender, RoutedEventArgs e) => _exportCts?.Cancel();
-
+    private static string FormatName(ExportFormat f) => f switch
+    {
+        ExportFormat.Mp4Hevc => "MP4 HEVC", ExportFormat.MkvH264 => "MKV H.264", ExportFormat.Wav => "WAV", ExportFormat.Png => "PNG", _ => "MP4 H.264",
+    };
     private static void TryDelete(string f) { try { File.Delete(f); } catch (IOException) { } }
 
     protected override void OnClosed(EventArgs e)
@@ -634,7 +660,6 @@ public partial class EditorWindow : Window
         CompositionTarget.Rendering -= OnFrame;
         _cacheCts.Cancel();
         _autosave.Stop();
-        _exportCts?.Cancel();
         if (_dirty && _m != null) Save();
         foreach (var el in new[] { ScreenMedia, CamMedia, MicMedia, SysMedia }) el.Close();
         base.OnClosed(e);

@@ -105,26 +105,30 @@ public sealed class FfmpegProcess : IDisposable
 /// <summary>An H.264 encoder option plus the filter needed to feed it from ddagrab's GPU frames.</summary>
 public sealed record EncoderChoice(string Name, string CaptureFilter, bool Hardware)
 {
+    public bool Hevc => Name.StartsWith("hevc") || Name == "libx265";
+
     public string[] QualityArgs(ExportQuality q)
     {
-        var (cq, i) = q switch { ExportQuality.Fast => ("28", 0), ExportQuality.High => ("19", 2), _ => ("23", 1) };
+        var (cq, i) = q switch { ExportQuality.Fast => ("28", 0), ExportQuality.High => ("19", 2), ExportQuality.Max => ("16", 3), _ => ("23", 1) };
         return Name switch
         {
-            "h264_nvenc" => ["-c:v", Name, "-preset", new[] { "p2", "p4", "p6" }[i], "-rc", "vbr", "-cq", cq, "-b:v", "0"],
-            "h264_qsv" => ["-c:v", Name, "-preset", new[] { "veryfast", "medium", "slower" }[i], "-global_quality", cq],
-            "h264_amf" => ["-c:v", Name, "-quality", new[] { "speed", "balanced", "quality" }[i], "-rc", "cqp", "-qp_i", cq, "-qp_p", cq],
-            _ => ["-c:v", "libx264", "-preset", new[] { "veryfast", "medium", "slow" }[i], "-crf", cq],
+            "h264_nvenc" or "hevc_nvenc" => ["-c:v", Name, "-preset", new[] { "p2", "p4", "p6", "p7" }[i], "-rc", "vbr", "-cq", cq, "-b:v", "0"],
+            "h264_qsv" or "hevc_qsv" => ["-c:v", Name, "-preset", new[] { "veryfast", "medium", "slower", "veryslow" }[i], "-global_quality", cq],
+            "h264_amf" or "hevc_amf" => ["-c:v", Name, "-quality", new[] { "speed", "balanced", "quality", "quality" }[i], "-rc", "cqp", "-qp_i", cq, "-qp_p", cq],
+            "libx265" => ["-c:v", Name, "-preset", new[] { "veryfast", "medium", "slow", "slower" }[i], "-crf", cq],
+            _ => ["-c:v", "libx264", "-preset", new[] { "veryfast", "medium", "slow", "slower" }[i], "-crf", cq],
         };
     }
 
     /// <summary>Pixel format for frames coming from system memory (export path).</summary>
-    public string CpuPixFmt => Name is "h264_qsv" or "h264_amf" ? "nv12" : "yuv420p";
+    public string CpuPixFmt => Name.EndsWith("_qsv") || Name.EndsWith("_amf") ? "nv12" : "yuv420p";
 }
 
 /// <summary>Detects what actually works on this machine by encoding a few frames — driver presence alone is not proof.</summary>
 public static class EncoderProbe
 {
     public static readonly EncoderChoice Cpu = new("libx264", "hwdownload,format=bgra,format=yuv420p", false);
+    public static readonly EncoderChoice CpuHevc = new("libx265", "", false);
 
     // Order matters: zero-copy GPU paths first, then hardware encoders fed from system memory, then CPU.
     private static readonly EncoderChoice[] CaptureCandidates =
@@ -150,15 +154,15 @@ public static class EncoderProbe
         return Cpu;
     }
 
-    public static async Task<EncoderChoice> ForExportAsync()
+    public static async Task<EncoderChoice> ForExportAsync(bool hevc = false)
     {
-        foreach (var name in new[] { "h264_nvenc", "h264_qsv", "h264_amf" })
+        foreach (var name in hevc ? new[] { "hevc_nvenc", "hevc_qsv", "hevc_amf" } : new[] { "h264_nvenc", "h264_qsv", "h264_amf" })
         {
             var c = new EncoderChoice(name, "", true);
             if (await Works(["-loglevel", "error", "-f", "lavfi", "-i", "color=s=640x360:d=0.2", "-pix_fmt", c.CpuPixFmt, .. c.QualityArgs(ExportQuality.Fast), "-f", "null", "-"]))
                 return c;
         }
-        return Cpu;
+        return hevc ? CpuHevc : Cpu;
     }
 
     private static async Task<bool> Works(IEnumerable<string> args)

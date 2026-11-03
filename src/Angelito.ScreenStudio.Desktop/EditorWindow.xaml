@@ -40,9 +40,8 @@
                 <Button Content="Eliminar tramo" Click="OnDeleteSegment" Margin="6,0,0,0" ToolTip="Eliminar el tramo bajo el cabezal (Supr)"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                <ProgressBar x:Name="ExportProgress" Width="160" Height="6" Maximum="1" Visibility="Collapsed" VerticalAlignment="Center"/>
-                <Button x:Name="CancelExportBtn" Content="Cancelar" Click="OnCancelExport" Margin="8,0,0,0" Visibility="Collapsed"/>
-                <Button x:Name="ExportBtn" Content="Exportar MP4" Style="{StaticResource AccentButton}" Click="OnExport" Margin="8,0,0,0"/>
+                <Button Content="Cola" Click="OnShowQueue" ToolTip="Ver exportaciones"/>
+                <Button x:Name="ExportBtn" Content="Exportar…" Style="{StaticResource AccentButton}" Click="OnExport" Margin="8,0,0,0"/>
             </StackPanel>
             <TextBlock x:Name="ProjectName" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.7"/>
         </DockPanel>
@@ -246,7 +245,23 @@
                                Text="Arrastra el video en la vista previa para encuadrar. Los zooms (también de 1.0×) mueven el encuadre en el tiempo."/>
 
                     <TextBlock Style="{StaticResource Section}" Text="Exportación"/>
-                    <ComboBox x:Name="ExportHeight" SelectionChanged="OnExportEdit">
+                    <ComboBox x:Name="PresetBox" SelectionChanged="OnPreset" ToolTip="Rellena los ajustes de abajo; puedes cambiarlos después">
+                        <ComboBoxItem Content="Preset…" IsEnabled="False"/>
+                        <ComboBoxItem Content="Rápido"/>
+                        <ComboBoxItem Content="Equilibrado"/>
+                        <ComboBoxItem Content="Alta calidad"/>
+                        <ComboBoxItem Content="Máxima calidad"/>
+                        <ComboBoxItem Content="YouTube 4K"/>
+                        <ComboBoxItem Content="Redes sociales (9:16, 1080×1920)"/>
+                    </ComboBox>
+                    <ComboBox x:Name="ExportFormatBox" Margin="0,6,0,0" SelectionChanged="OnExportEdit">
+                        <ComboBoxItem Content="MP4 · H.264 (compatible)"/>
+                        <ComboBoxItem Content="MP4 · HEVC/H.265 (más pequeño)"/>
+                        <ComboBoxItem Content="MKV · H.264"/>
+                        <ComboBoxItem Content="WAV · solo audio"/>
+                        <ComboBoxItem Content="PNG · fotograma del cabezal"/>
+                    </ComboBox>
+                    <ComboBox x:Name="ExportHeight" Margin="0,6,0,0" SelectionChanged="OnExportEdit">
                         <ComboBoxItem Content="Resolución nativa" Tag="0"/>
                         <ComboBoxItem Content="2160p (4K)" Tag="2160"/>
                         <ComboBoxItem Content="1440p" Tag="1440"/>
@@ -257,6 +272,13 @@
                         <ComboBoxItem Content="Rápida"/>
                         <ComboBoxItem Content="Equilibrada"/>
                         <ComboBoxItem Content="Alta calidad"/>
+                        <ComboBoxItem Content="Máxima calidad"/>
+                    </ComboBox>
+                    <ComboBox x:Name="ExportFpsBox" Margin="0,6,0,0" SelectionChanged="OnExportEdit">
+                        <ComboBoxItem Content="FPS de la grabación" Tag="0"/>
+                        <ComboBoxItem Content="24 FPS" Tag="24"/>
+                        <ComboBoxItem Content="30 FPS" Tag="30"/>
+                        <ComboBoxItem Content="60 FPS" Tag="60"/>
                     </ComboBox>
                     <TextBlock x:Name="ExportInfo" Style="{StaticResource Hint}" Margin="0,6,0,0"/>
                 </StackPanel>
