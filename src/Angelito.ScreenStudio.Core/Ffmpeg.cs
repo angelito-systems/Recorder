@@ -134,6 +134,12 @@ public sealed record EncoderChoice(string Name, string CaptureFilter, bool Hardw
         };
     }
 
+    /// <summary>
+    /// Pixel format to request for raw BGRA input (window capture). NVENC and AMF take BGRA and convert to YUV on the GPU;
+    /// the others need ffmpeg to convert on the CPU.
+    /// </summary>
+    public string BgraInputPixFmt => Name is "h264_nvenc" or "hevc_nvenc" or "h264_amf" or "hevc_amf" ? "bgra" : CpuPixFmt;
+
     /// <summary>Pixel format for frames coming from system memory (export path).</summary>
     public string CpuPixFmt => Name.EndsWith("_qsv") || Name.EndsWith("_amf") ? "nv12" : "yuv420p";
 }

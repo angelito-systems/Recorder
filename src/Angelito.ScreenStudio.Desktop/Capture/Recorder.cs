@@ -153,7 +153,7 @@ public sealed class Recorder
     {
         _win = new WindowCapture(_o.Window!.Handle, (_w, _h));
         var a = new List<string> { "-f", "rawvideo", "-pix_fmt", "bgra", "-video_size", $"{_w}x{_h}", "-use_wallclock_as_timestamps", "1", "-i", "pipe:0",
-            "-fps_mode", "cfr", "-r", _o.Fps.ToString(), "-pix_fmt", _o.CpuEncoder.CpuPixFmt };
+            "-fps_mode", "cfr", "-r", _o.Fps.ToString(), "-pix_fmt", _o.CpuEncoder.BgraInputPixFmt };
         a.AddRange(_o.CpuEncoder.QualityArgs(ExportQuality.High));
         a.AddRange(["-g", (_o.Fps * 2).ToString(), .. SessionFinalizer.CrashSafeMkvArgs, "-y", part.Screen]);
         _screen = StartFfmpeg(a, "ventana", _ => { });
