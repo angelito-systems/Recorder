@@ -177,5 +177,6 @@ public class ExportIntegrationTests
         Assert.True(File.Exists(outPath));
         Assert.Equal(2.0, await FfmpegProcess.ProbeDurationAsync(outPath), 1);
         Assert.True(last > 0.5);
+        Assert.Contains("Subtitle: mov_text", (await FfmpegProcess.RunAsync(["-hide_banner", "-i", outPath])).Log); // soft track next to the burned-in one
     }
 }
