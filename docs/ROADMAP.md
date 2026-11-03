@@ -24,6 +24,7 @@ Estado verificado el 2026-11-03 en i7-13650HX / RTX 4050 Laptop / Intel UHD, Win
 - Atajos globales: Ctrl+Mayús+F9 pausa/reanuda, Ctrl+Mayús+F10 graba/detiene (si otra app ya los usa se anota en el log).
 - Timeline: barra de desplazamiento cuando está ampliado; al arrastrar o recorrer cerca de un borde se desplaza solo (con cada movimiento del ratón).
 - Subtítulos: además de incrustados (opcional), MP4 y MKV llevan una pista suave que el reproductor puede activar o quitar (mov_text / srt), en tiempos del video exportado.
+- Editor de la lista de atajos (botón «Editar lista…» del grabador): atajos adicionales y programas excluidos, guardados en keys.json. Nunca se aceptan combinaciones que escriben texto (letras, Mayús+letra, Ctrl+Alt+letra = AltGr), tampoco si se editan a mano en keys.json.
 - 11 pruebas automáticas (zoom, auto-zoom, proyecto, historial, recuperación de `.bak`, formato de cursor, layout, exportación FFmpeg real con cortes+zoom+clics+webcam+audio).
 
 ## Pendiente, por prioridad
@@ -31,7 +32,7 @@ Estado verificado el 2026-11-03 en i7-13650HX / RTX 4050 Laptop / Intel UHD, Win
 1. Ventana: si se redimensiona durante la grabación se recorta/rellena (no se escala). Siguiente paso de rendimiento posible: codificar en proceso con Media Foundation desde la textura (sin copia a CPU ni tubería).
 2. Reordenar clips (requiere pasar el timeline de tiempo de origen a tiempo de salida: vista previa, arrastres y rangos asumen orden de origen).
 3. Imágenes/logotipos, numeración de pasos y callouts; animaciones de entrada/salida.
-4. Animaciones de entrada/salida para atajos y textos; editor visual de la lista de atajos permitidos.
+4. Animaciones de entrada/salida para atajos y textos.
 5. Cursor ampliado/suavizado en posproducción (requiere grabar sin cursor y dibujarlo, `draw_mouse=0` + `sendcmd`).
 6. Compositor GPU propio (D3D11) para vista previa y exportación a la vez (hoy la cámara usa `perspective` en CPU: ~230 fps a 1080p).
 7. AV1 (av1_nvenc/qsv/amf existen en esta compilación; falta validar compatibilidad de reproducción); seguimiento automático del cursor como propuesta de encuadre.

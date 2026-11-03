@@ -99,3 +99,24 @@ public class KeyFilterTests
         return result;
     }
 }
+
+public class KeySettingsTests
+{
+    [Fact]
+    public void EditorRefusesTextAndNormalizes()
+    {
+        var (ok, bad) = KeySettings.ParseAllowed(["shift+ctrl+s", " Ctrl+Shift+S ", "", "A", "Shift+A", "Ctrl+Alt+2", "Ctrl+Alt+Up", "Win+Shift+Q", "Hyper+X", "F13"]);
+        Assert.Equal(["Ctrl+Shift+S", "Ctrl+Alt+Up", "Shift+Win+Q", "F13"], ok);
+        Assert.Equal(["A", "Shift+A", "Ctrl+Alt+2", "Hyper+X"], bad);
+    }
+
+    [Fact]
+    public void HandEditedKeysJsonCannotAllowTyping()
+    {
+        var f = new KeyFilter(extraAllowed: ["A", "Shift+A", "Ctrl+Alt+Q", "Ctrl+Alt+F1"]);
+        Assert.Null(f.Accept(0x41, Mods.None, "notepad"));
+        Assert.Null(f.Accept(0x41, Mods.Shift, "notepad"));
+        Assert.Null(f.Accept(0x51, Mods.Ctrl | Mods.Alt, "notepad"));
+        Assert.Equal("Ctrl+Alt+F1", f.Accept(0x70, Mods.Ctrl | Mods.Alt, "code"));
+    }
+}

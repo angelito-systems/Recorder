@@ -43,7 +43,10 @@
         </Grid>
         <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0"
                    Text="Se registran la posición y los clics del ratón para editar zoom y efectos después."/>
-        <CheckBox x:Name="KeysBox" Content="Mostrar atajos de teclado" Margin="0,10,0,0"/>
+        <DockPanel Margin="0,10,0,0">
+            <Button DockPanel.Dock="Right" Content="Editar lista…" Click="OnEditKeys" Padding="8,0"/>
+            <CheckBox x:Name="KeysBox" Content="Mostrar atajos de teclado" VerticalAlignment="Center"/>
+        </DockPanel>
         <TextBlock Style="{StaticResource Hint}" Margin="22,2,0,0"
                    Text="Solo se guardan combinaciones de una lista permitida (Ctrl+S, Alt+Tab…). Nunca texto escrito ni contraseñas; se ignoran los gestores de contraseñas. Ctrl+Mayús+F12 suspende o reanuda al instante."/>
 
