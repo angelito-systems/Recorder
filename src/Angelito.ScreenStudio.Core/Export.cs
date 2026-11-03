@@ -6,6 +6,13 @@ namespace Angelito.ScreenStudio.Core;
 /// <summary>Placement math shared by the editor preview and the exporter.</summary>
 public static class Layout
 {
+    /// <summary>Fade-in/out length for texts, subtitles and shortcuts; at most half of a short item.</summary>
+    public static double FadeLength(double start, double end) => Math.Min(0.2, (end - start) / 2);
+
+    /// <summary>Opacity at time t of an item shown from start to end (0 outside). Same curve as the export's alpha.</summary>
+    public static double FadeAlpha(double t, double start, double end) =>
+        t < start || t > end ? 0 : Math.Clamp(Math.Min(t - start, end - t) / Math.Max(1e-3, FadeLength(start, end)), 0, 1);
+
     public static (int W, int H) OutputSize(SessionManifest m, ExportSettings e, ProjectCanvas? canvas = null)
     {
         canvas ??= new ProjectCanvas();
@@ -149,6 +156,7 @@ public static class Exporter
                 var (r, gg, b) = ParseColor(color);
                 g.Append(F($"[{last}]drawtext=fontfile='{FilterPath(Font(bold))}':textfile='{FilterPath(file)}':expansion=none:text_align=C:fontsize={px}:fontcolor=0x{r:X2}{gg:X2}{b:X2}"));
                 if (box) g.Append(F($":box=1:boxcolor=black@0.55:boxborderw={TextPad(px)}"));
+                g.Append(F($":alpha='clip(min(t-{start:F3},{end:F3}-t)/{Math.Max(1e-3, Layout.FadeLength(start, end)):F3},0,1)'"));
                 g.Append(F($":x=({cx}*w-text_w/2):y=({cy}*h-text_h/2):enable='between(t,{start:F3},{end:F3})'[x{n}];\n"));
                 last = $"x{n++}";
             }
@@ -164,14 +172,17 @@ public static class Exporter
                 {
                     if (keyImage(group.Key) is not { } img) continue;
                     var shows = group.ToList();
-                    args.AddRange(["-i", img.Png]);
-                    g.Append(F($"[{input}:v]split={shows.Count}"));
+                    // Looped so each showing can fade; -t bounds the loop to the source length.
+                    args.AddRange(["-loop", "1", "-framerate", F($"{fps}"), "-t", F($"{srcEnd:F3}"), "-i", img.Png]);
+                    g.Append(F($"[{input}:v]format=rgba,split={shows.Count}"));
                     for (var i = 0; i < shows.Count; i++) g.Append($"[kq{kn + i}]");
                     g.Append(";\n");
                     int kx = (int)Math.Round(p.Keys.X * ow - img.W / 2.0), ky = (int)Math.Round(p.Keys.Y * oh - img.H / 2.0);
                     foreach (var (s, e, _) in shows)
                     {
-                        g.Append(F($"[{last}][kq{kn}]overlay={kx}:{ky}:enable='between(t,{s:F3},{e:F3})'[ko{kn}];\n"));
+                        var fd = Math.Max(1e-3, Layout.FadeLength(s, e));
+                        g.Append(F($"[kq{kn}]trim=start={s:F3}:end={e:F3},fade=t=in:st={s:F3}:d={fd:F3}:alpha=1,fade=t=out:st={e - fd:F3}:d={fd:F3}:alpha=1[kf{kn}];\n"));
+                        g.Append(F($"[{last}][kf{kn}]overlay={kx}:{ky}:eof_action=pass[ko{kn}];\n"));
                         last = $"ko{kn++}";
                     }
                     input++;
