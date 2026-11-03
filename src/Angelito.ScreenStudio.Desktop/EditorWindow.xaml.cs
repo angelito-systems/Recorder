@@ -621,7 +621,7 @@ public partial class EditorWindow : Window
         {
             Filter = fmt switch
             {
-                ExportFormat.MkvH264 => "Video MKV (H.264)|*.mkv", ExportFormat.Mp4Hevc => "Video MP4 (HEVC/H.265)|*.mp4",
+                ExportFormat.MkvH264 => "Video MKV (H.264)|*.mkv", ExportFormat.Mp4Hevc => "Video MP4 (HEVC/H.265)|*.mp4", ExportFormat.Mp4Av1 => "Video MP4 (AV1)|*.mp4",
                 ExportFormat.Wav => "Audio WAV|*.wav", ExportFormat.Png => "Imagen PNG|*.png", _ => "Video MP4 (H.264)|*.mp4",
             },
             FileName = ProjectName.Text + (fmt == ExportFormat.Png ? $"-{Now:0.00}s" : "") + P.Export.Extension,
@@ -662,7 +662,7 @@ public partial class EditorWindow : Window
 
     private static string FormatName(ExportFormat f) => f switch
     {
-        ExportFormat.Mp4Hevc => "MP4 HEVC", ExportFormat.MkvH264 => "MKV H.264", ExportFormat.Wav => "WAV", ExportFormat.Png => "PNG", _ => "MP4 H.264",
+        ExportFormat.Mp4Hevc => "MP4 HEVC", ExportFormat.Mp4Av1 => "MP4 AV1", ExportFormat.MkvH264 => "MKV H.264", ExportFormat.Wav => "WAV", ExportFormat.Png => "PNG", _ => "MP4 H.264",
     };
     private static void TryDelete(string f) { try { File.Delete(f); } catch (IOException) { } }
 

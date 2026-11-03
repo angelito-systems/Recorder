@@ -56,7 +56,7 @@ public sealed class RenderJob : INotifyPropertyChanged
 public static class RenderQueue
 {
     public static ObservableCollection<RenderJob> Jobs { get; } = [];
-    private static readonly Dictionary<bool, Task<EncoderChoice>> s_encoders = [];
+    private static readonly Dictionary<ExportFormat, Task<EncoderChoice>> s_encoders = [];
     private static bool s_running;
 
     public static bool Busy => Jobs.Any(j => j.IsActive);
@@ -90,8 +90,8 @@ public static class RenderQueue
         var part = Path.Combine(Path.GetDirectoryName(job.OutputPath)!, Path.GetFileNameWithoutExtension(job.OutputPath) + ".part" + Path.GetExtension(job.OutputPath));
         try
         {
-            var hevc = job.Project.Export.Format == ExportFormat.Mp4Hevc;
-            if (!s_encoders.TryGetValue(hevc, out var probe)) s_encoders[hevc] = probe = EncoderProbe.ForExportAsync(hevc);
+            var fmt = job.Project.Export.Format;
+            if (!s_encoders.TryGetValue(fmt, out var probe)) s_encoders[fmt] = probe = EncoderProbe.ForExportAsync(fmt);
             var enc = await probe;
             job.Encoder = job.Project.Export.Format switch { ExportFormat.Wav => "PCM", ExportFormat.Png => "PNG", _ => enc.Name };
             var graph = Path.Combine(job.TempDir, "export.graph");
