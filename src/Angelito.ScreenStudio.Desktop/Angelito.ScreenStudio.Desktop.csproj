@@ -13,7 +13,7 @@
     <AssemblyName>AngelitoScreenStudio</AssemblyName>
     <Product>Angelito Screen Studio Pro</Product>
     <Company>Angelito Systems S.A.C.</Company>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Copyright>© Angelito Systems S.A.C.</Copyright>
     <!-- WPF0001: Fluent ThemeMode is flagged experimental; used for native light/dark support. -->
