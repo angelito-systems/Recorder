@@ -65,7 +65,7 @@ public class KeyFilterTests
     [Fact]
     public async Task ExportOverlaysKeystrokes()
     {
-        var dir = Directory.CreateTempSubdirectory("ass-keys").FullName;
+        var dir = TempDir.Create("ass-keys").FullName;
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=3", "-c:v", "libx264", "-pix_fmt", "yuv420p", Path.Combine(dir, "screen.mp4")])).Code);
         var png = Path.Combine(dir, "k.png");
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "color=c=white:s=120x40,format=rgba", "-frames:v", "1", png])).Code);

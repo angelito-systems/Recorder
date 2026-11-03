@@ -34,7 +34,7 @@ public class CanvasTests
     [InlineData(CanvasAspect.Vertical)]
     public async Task ExportMatchesViewRect(CanvasAspect aspect)
     {
-        var dir = Directory.CreateTempSubdirectory("ass-canvas").FullName;
+        var dir = TempDir.Create("ass-canvas").FullName;
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "testsrc2=s=1280x720:r=30:d=3", "-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv420p", Path.Combine(dir, "screen.mp4")])).Code);
         var m = new SessionManifest { Width = 1280, Height = 720, Fps = 30, Complete = true };
         var p = new StudioProject

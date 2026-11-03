@@ -64,7 +64,7 @@ public class MaskTests
     [InlineData(AnnotationKind.Pixelate)]
     public async Task MaskChangesOnlyItsRegion(AnnotationKind kind)
     {
-        var dir = Directory.CreateTempSubdirectory("ass-mask").FullName;
+        var dir = TempDir.Create("ass-mask").FullName;
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=1", "-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv420p", Path.Combine(dir, "screen.mp4")])).Code);
         var m = new SessionManifest { Width = 640, Height = 360, Fps = 30, Complete = true };
         // Mask the left half (odd pixel bounds on purpose: the exporter must grow, not shrink, the box).
@@ -80,7 +80,7 @@ public class MaskTests
     [Fact]
     public async Task SmallBlurStillDestroysDetail()
     {
-        var dir = Directory.CreateTempSubdirectory("ass-mask").FullName;
+        var dir = TempDir.Create("ass-mask").FullName;
         // The real case: small black text (a "password") on white, under a 64×24 mask.
         var font = Exporter.Font(false).Replace('\\', '/').Replace(":", "\\:");
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", $"color=white:s=640x360:r=30:d=1,drawtext=fontfile='{font}':text='clave 1234':fontsize=15:fontcolor=black:x=194:y=112",
@@ -113,7 +113,7 @@ public class MediaCacheTests
     [Fact]
     public async Task ThumbnailsAreGeneratedOnceAndCoverTheVideo()
     {
-        var dir = Directory.CreateTempSubdirectory("ass-cache").FullName;
+        var dir = TempDir.Create("ass-cache").FullName;
         var video = Path.Combine(dir, "screen.mp4");
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=7", "-g", "60", "-c:v", "libx264", "-pix_fmt", "yuv420p", video])).Code);
         var thumbs = await MediaCache.ThumbnailsAsync(video, dir, 7, CancellationToken.None);
@@ -127,7 +127,7 @@ public class MediaCacheTests
     [Fact]
     public async Task PeaksFollowLoudness()
     {
-        var dir = Directory.CreateTempSubdirectory("ass-cache").FullName;
+        var dir = TempDir.Create("ass-cache").FullName;
         var wav = Path.Combine(dir, "mic.wav");
         // 1 s of silence, then 1 s of a loud tone
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=1", "-f", "lavfi", "-i", "sine=f=440:d=1:r=48000",

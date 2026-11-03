@@ -7,7 +7,7 @@ public class RecoveryTests
 {
     private static async Task<string> CrashedSession()
     {
-        var root = Directory.CreateTempSubdirectory("ass-recover").FullName;
+        var root = TempDir.Create("ass-recover").FullName;
         var dir = Path.Combine(root, "2026-11-03_10-00-00");
         Directory.CreateDirectory(dir);
 

@@ -6,7 +6,7 @@ public class FormatTests
 {
     private static async Task<(string Dir, SessionManifest M, StudioProject P)> Session()
     {
-        var dir = Directory.CreateTempSubdirectory("ass-fmt").FullName;
+        var dir = TempDir.Create("ass-fmt").FullName;
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=3", "-c:v", "libx264", "-pix_fmt", "yuv420p", Path.Combine(dir, "screen.mp4")])).Code);
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "sine=f=440:d=3", Path.Combine(dir, "mic.wav")])).Code);
         var m = new SessionManifest { Width = 640, Height = 360, Fps = 30, Mic = "mic.wav", Complete = true };

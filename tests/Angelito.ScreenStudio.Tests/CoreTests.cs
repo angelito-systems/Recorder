@@ -82,7 +82,7 @@ public class ProjectTests
     [Fact]
     public void SaveLoadRoundTrip_AndBackupRecovery()
     {
-        var dir = Directory.CreateTempSubdirectory("ass").FullName;
+        var dir = TempDir.Create("ass").FullName;
         var path = Path.Combine(dir, "p" + StudioProject.Extension);
         var p = new StudioProject { Segments = [new(1, 2)], Zooms = [new(0, 1, 2, 0.1, 0.2)], Webcam = new(Shape: WebcamShape.Rounded) };
         p.Save(path);
@@ -135,7 +135,7 @@ public class PartsTests
     [Fact]
     public async Task AudioFilterKeepsOnlyRecordedParts()
     {
-        var dir = Directory.CreateTempSubdirectory("ass-parts").FullName;
+        var dir = TempDir.Create("ass-parts").FullName;
         var src = Path.Combine(dir, "a.wav");
         var dst = Path.Combine(dir, "b.wav");
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "sine=d=8", src])).Code);
@@ -152,7 +152,7 @@ public class ExportIntegrationTests
     [Fact]
     public async Task ExportsCutsZoomClicksWebcamAndAudio()
     {
-        var dir = Directory.CreateTempSubdirectory("ass-exp").FullName;
+        var dir = TempDir.Create("ass-exp").FullName;
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=4", "-c:v", "libx264", "-pix_fmt", "yuv420p", Path.Combine(dir, "screen.mp4")])).Code);
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "smptebars=s=320x240:r=30:d=4", "-c:v", "libx264", "-pix_fmt", "yuv420p", Path.Combine(dir, "webcam.mp4")])).Code);
         Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "sine=f=440:d=3", Path.Combine(dir, "mic.wav")])).Code);
