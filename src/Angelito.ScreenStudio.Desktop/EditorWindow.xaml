@@ -70,6 +70,7 @@
                                           IsMuted="True" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                         </Border>
                         <Canvas x:Name="TextLayer"/>
+                        <Canvas x:Name="KeyLayer"/>
                     </Grid>
                 </Viewbox>
             </Border>
@@ -178,6 +179,21 @@
                         </WrapPanel>
                     </StackPanel>
                     <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Arrastra la forma en la vista previa para moverla y sus puntos para cambiar el tamaño."/>
+
+                    <StackPanel x:Name="KeysSection">
+                        <TextBlock Style="{StaticResource Section}" Text="Atajos de teclado"/>
+                        <CheckBox x:Name="KeysVisible" Content="Mostrar atajos" Click="OnKeysEdit"/>
+                        <ComboBox x:Name="KeysLook" Margin="0,6,0,0" SelectionChanged="OnKeysEdit">
+                            <ComboBoxItem Content="Cápsula"/>
+                            <ComboBoxItem Content="Minimalista"/>
+                        </ComboBox>
+                        <TextBlock Text="Tamaño" Margin="0,6,0,0"/>
+                        <Slider x:Name="KeysSize" Minimum="0.02" Maximum="0.1" ValueChanged="OnKeysEdit"/>
+                        <TextBlock Text="Duración en pantalla"/>
+                        <Slider x:Name="KeysDuration" Minimum="0.5" Maximum="3" ValueChanged="OnKeysEdit"/>
+                        <TextBlock x:Name="KeysInfo" Style="{StaticResource Hint}"/>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0" Text="Arrastra el atajo en la vista previa para moverlo."/>
+                    </StackPanel>
 
                     <TextBlock Style="{StaticResource Section}" Text="Cursor"/>
                     <CheckBox x:Name="ShowClicks" Content="Resaltar clics" Click="OnCursorEdit"/>

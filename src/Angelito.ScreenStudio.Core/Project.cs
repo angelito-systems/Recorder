@@ -75,6 +75,11 @@ public sealed record ProjectCanvas(CanvasAspect Aspect = CanvasAspect.Source, do
     }
 }
 
+public enum KeyLook { Capsule, Minimal }
+
+/// <summary>Keystroke overlay style. X/Y is the center normalized to the output; Size is relative to its short side.</summary>
+public sealed record KeystrokeStyle(bool Visible = true, KeyLook Look = KeyLook.Capsule, double X = 0.5, double Y = 0.8, double Size = 0.04, double Duration = 1.2);
+
 public enum ExportQuality { Fast, Balanced, High, Max }
 
 public enum ExportFormat { Mp4H264, Mp4Hevc, MkvH264, Wav, Png }
@@ -101,6 +106,7 @@ public sealed record StudioProject
     public AudioMix Audio { get; init; } = new();
     public ExportSettings Export { get; init; } = new();
     public ProjectCanvas Canvas { get; init; } = new();
+    public KeystrokeStyle Keys { get; init; } = new();
     public List<TextItem> Texts { get; init; } = [];
     public List<Cue> Subtitles { get; init; } = [];
     public List<Annotation> Annotations { get; init; } = [];

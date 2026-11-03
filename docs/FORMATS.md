@@ -8,6 +8,7 @@
 | `screen.mp4` | Pantalla (completa o región), H.264, cursor del sistema incluido. Se graba en tramos `screen_N.mkv` (uno por cada inicio/reanudación; resisten cierres inesperados) que al detener se unen sin re-codificar. |
 | `webcam.mp4` | Cámara, opcional. Con un solo tramo se remuxa y conserva su offset; con pausas, cada tramo se recorta a la ventana de su tramo de pantalla y se re-codifica una vez. |
 | `mic.wav`, `system.wav` | Audio PCM float de WASAPI, opcionales. Se graban continuos (`*.raw.wav`, silencio durante la pausa) y al detener se recortan exactamente a los tramos de video. |
+| `keys.txt` | Solo si se activó el visualizador: `t combinación` por línea (p. ej. `2.7644 Ctrl+S`) en tiempo del video. Únicamente combinaciones de la lista permitida; nunca texto, letras sueltas, Mayús+letra ni AltGr. |
 | `cursor.txt` | Una línea por evento: `t x y k` — `t` segundos en tiempo del video final (las pausas no existen), `x y` píxeles relativos al área capturada, `k` 0=movimiento 1=izq 2=der 3=medio. Sin teclado. |
 | `session.json` tras detener | Todos los offsets quedan en 0 (salvo la cámara de un solo tramo): el editor ve una única línea de tiempo. Si la finalización falla, los tramos y archivos `.raw` se conservan. |
 | `.cache\` | Miniaturas (`thumbs-*`, JPG cada 2 s o más, máx. ~600) y picos de audio (`peaks-*`, 100 por segundo, 1 byte). Se regeneran si el medio es más nuevo; se pueden borrar sin perder nada. |
@@ -23,7 +24,12 @@
 - `annotations`: `{start, end, kind, x, y, x2, y2, color, thickness}` — `kind`: Rectangle, Ellipse, Arrow, Highlight, Blur, Pixelate. Puntos normalizados al cuadro de **origen** (cola→punta en flechas, esquinas en el resto), así siguen al contenido bajo el zoom.
 - `canvas`: `{aspect, x, y}` — formato de salida (Source, Wide 16:9, Vertical 9:16, Square 1:1, Classic 4:3) y centro de encuadre normalizado al origen. Los zooms (también de escala 1.0) mueven ese encuadre en el tiempo.
 - `export.height`: lado corto de la salida en píxeles (0 = tamaño nativo del encuadre). Tamaños de cámara y textos son relativos al lado corto.
+- `keys`: `{visible, look, x, y, size, duration}` — estilo del visualizador de atajos (Capsule/Minimal), centro relativo a la salida.
 - `cursor`, `webcam`, `audio`, `export`: estilos y ajustes.
+
+## Preferencias `%LocalAppData%\AngelitoScreenStudio\keys.json`
+
+`{"extraAllowed": ["Ctrl+Shift+PageUp"], "excludedApps": ["mibanco"]}` — atajos adicionales permitidos (se normalizan; combinaciones con AltGr se rechazan) y procesos donde no se captura nada (además de los gestores de contraseñas por defecto).
 
 Campos nuevos son opcionales: proyectos anteriores abren sin migración.
 

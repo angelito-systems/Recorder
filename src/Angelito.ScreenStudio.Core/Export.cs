@@ -41,7 +41,8 @@ public static class Exporter
     private static string F(FormattableString s) => s.ToString(CultureInfo.InvariantCulture);
 
     public static ExportPlan Build(StudioProject p, SessionManifest m, string sessionDir, IReadOnlyList<CursorEvent> cursor,
-        EncoderChoice enc, string outPath, string graphPath, Func<int, (string Png, int X, int Y)?>? annotationImage = null)
+        EncoderChoice enc, string outPath, string graphPath, Func<int, (string Png, int X, int Y)?>? annotationImage = null,
+        IReadOnlyList<KeyEvent>? keys = null, Func<string, (string Png, int W, int H)?>? keyImage = null)
     {
         if (p.Segments.Count == 0) throw new InvalidOperationException("No hay segmentos para exportar.");
         var (ow, oh) = Layout.OutputSize(m, p.Export, p.Canvas);
@@ -154,6 +155,28 @@ public static class Exporter
             foreach (var t in p.Texts) Text(t.Start, t.End, t.Text, t.X, t.Y, t.Size, t.Color, t.Background, t.Bold);
             if (p.SubtitleStyle.Burn)
                 foreach (var c in p.Subtitles) Text(c.Start, c.End, c.Text, 0.5, p.SubtitleStyle.Y, p.SubtitleStyle.Size, p.SubtitleStyle.Color, p.SubtitleStyle.Background, false);
+
+            // Keystrokes on top: one pre-rendered image per distinct shortcut (the preview's own drawing), split per showing.
+            if (p.Keys.Visible && keys is { Count: > 0 } && keyImage != null)
+            {
+                var kn = 0;
+                foreach (var group in KeyLog.Windows(keys, p.Keys.Duration).Where(w => w.End > 0 && w.Start < srcEnd).GroupBy(w => w.Combo))
+                {
+                    if (keyImage(group.Key) is not { } img) continue;
+                    var shows = group.ToList();
+                    args.AddRange(["-i", img.Png]);
+                    g.Append(F($"[{input}:v]split={shows.Count}"));
+                    for (var i = 0; i < shows.Count; i++) g.Append($"[kq{kn + i}]");
+                    g.Append(";\n");
+                    int kx = (int)Math.Round(p.Keys.X * ow - img.W / 2.0), ky = (int)Math.Round(p.Keys.Y * oh - img.H / 2.0);
+                    foreach (var (s, e, _) in shows)
+                    {
+                        g.Append(F($"[{last}][kq{kn}]overlay={kx}:{ky}:enable='between(t,{s:F3},{e:F3})'[ko{kn}];\n"));
+                        last = $"ko{kn++}";
+                    }
+                    input++;
+                }
+            }
         }
 
         // Audio: every source aligned to screen time, mixed, padded so cuts never run short.

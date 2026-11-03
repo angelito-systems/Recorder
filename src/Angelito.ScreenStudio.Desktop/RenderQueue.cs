@@ -22,6 +22,8 @@ public sealed class RenderJob : INotifyPropertyChanged
     public required string OutputPath { get; init; }
     public required string TempDir { get; init; }
     public required Dictionary<int, (string Png, int X, int Y)> AnnotationImages { get; init; }
+    public IReadOnlyList<KeyEvent> Keys { get; init; } = [];
+    public Dictionary<string, (string Png, int W, int H)> KeyImages { get; init; } = [];
     public CancellationTokenSource Cts { get; } = new();
 
     public string Name => Path.GetFileName(OutputPath);
@@ -94,7 +96,8 @@ public static class RenderQueue
             job.Encoder = job.Project.Export.Format switch { ExportFormat.Wav => "PCM", ExportFormat.Png => "PNG", _ => enc.Name };
             var graph = Path.Combine(job.TempDir, "export.graph");
             var plan = Exporter.Build(job.Project, job.Manifest, job.SessionDir, job.Cursor, enc, part, graph,
-                i => job.AnnotationImages.TryGetValue(i, out var v) ? v : null);
+                i => job.AnnotationImages.TryGetValue(i, out var v) ? v : null,
+                job.Keys, c => job.KeyImages.TryGetValue(c, out var k) ? k : null);
             var ui = Application.Current.Dispatcher;
             await Exporter.RunAsync(plan, graph, v => ui.BeginInvoke(() => job.Progress = v), job.Cts.Token);
             File.Move(part, job.OutputPath, overwrite: true);

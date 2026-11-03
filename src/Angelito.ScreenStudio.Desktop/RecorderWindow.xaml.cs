@@ -66,7 +66,7 @@ public partial class RecorderWindow : Window
             var cam = CamBox.SelectedItem as string;
             var dir = Path.Combine(App.RecordingsDir, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
             _rec = new Recorder(new RecordOptions(mon, _region, int.Parse((string)((ComboBoxItem)FpsBox.SelectedItem).Tag), cam == NoCam ? null : cam,
-                MicBox.IsChecked == true, SysBox.IsChecked == true, await ScreenEncoder(mon), await _cpuEnc!, dir));
+                MicBox.IsChecked == true, SysBox.IsChecked == true, await ScreenEncoder(mon), await _cpuEnc!, dir, KeyFilterOrNull()));
             _rec.Warning += msg => Dispatcher.BeginInvoke(() => { App.Log(msg); Status.Text = msg; });
             _rec.Start();
             SetRecording(true);
@@ -110,7 +110,7 @@ public partial class RecorderWindow : Window
         RecordBtn.IsEnabled = true;
         RecordBtn.Content = on ? "■ Detener" : "● Grabar";
         Timer.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        MonitorBox.IsEnabled = CamBox.IsEnabled = FpsBox.IsEnabled = MicBox.IsEnabled = SysBox.IsEnabled = RegionBtn.IsEnabled = FullBtn.IsEnabled = OpenBtn.IsEnabled = !on;
+        MonitorBox.IsEnabled = CamBox.IsEnabled = FpsBox.IsEnabled = MicBox.IsEnabled = SysBox.IsEnabled = KeysBox.IsEnabled = RegionBtn.IsEnabled = FullBtn.IsEnabled = OpenBtn.IsEnabled = !on;
         PauseBtn.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         PauseBtn.IsEnabled = true;
         PauseBtn.Content = "❚❚ Pausar";
@@ -120,10 +120,18 @@ public partial class RecorderWindow : Window
     private void UpdateMeters()
     {
         if (_rec == null) return;
-        Timer.Text = TimeSpan.FromSeconds(_rec.Recorded).ToString(@"hh\:mm\:ss") + (_rec.IsPaused ? "  en pausa" : "");
+        Timer.Text = TimeSpan.FromSeconds(_rec.Recorded).ToString(@"hh\:mm\:ss") + (_rec.IsPaused ? "  en pausa" : "") + (_rec.KeysSuspended ? "  · atajos suspendidos" : "");
         MicMeter.Value = _rec.MicPeak;
         SysMeter.Value = _rec.SystemPeak;
         MicMeter.Foreground = _rec.MicPeak > 0.98f ? (System.Windows.Media.Brush)FindResource("Rec") : (System.Windows.Media.Brush)FindResource("Brand");
+    }
+
+    /// <summary>Allowed-list filter plus the user's additions from keys.json; null when the overlay is off.</summary>
+    private KeyFilter? KeyFilterOrNull()
+    {
+        if (KeysBox.IsChecked != true) return null;
+        var s = KeySettings.Load(Path.Combine(App.DataDir, "keys.json"));
+        return new KeyFilter(s.ExtraAllowed, s.ExcludedApps);
     }
 
     private async void OnPause(object sender, RoutedEventArgs e)

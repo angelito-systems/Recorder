@@ -12,7 +12,7 @@ namespace Angelito.ScreenStudio.Desktop.Capture;
 public sealed record Region(int X, int Y, int Width, int Height);
 
 public sealed record RecordOptions(MonitorInfo Monitor, Region? Region, int Fps, string? Webcam, bool Mic, bool SystemAudio,
-    EncoderChoice ScreenEncoder, EncoderChoice CpuEncoder, string Dir);
+    EncoderChoice ScreenEncoder, EncoderChoice CpuEncoder, string Dir, KeyFilter? Keys = null);
 
 /// <summary>
 /// One recording = one folder of independent streams (see docs/FORMATS.md). Every stream stamps its start against
@@ -39,7 +39,8 @@ public sealed class Recorder
     private WaveFileWriter? _micW, _sysW;
     private double _micOffset, _sysOffset;
     private MouseHook? _hook;
-    private StreamWriter? _cursor;
+    private StreamWriter? _cursor, _keys;
+    private KeyHook? _keyHook;
     private double _lastMove = -1, _pausedTotal, _pausedAt;
     private volatile bool _paused, _videoStopping, _stopping;
     private readonly List<Task> _audioStopped = [];
@@ -49,6 +50,7 @@ public sealed class Recorder
     /// <summary>Recorded time, excluding pauses (what the timer shows).</summary>
     public double Recorded => (_paused ? _pausedAt : Elapsed) - _pausedTotal;
     public bool IsPaused => _paused;
+    public bool KeysSuspended => _keyHook?.Suspended == true;
     public float MicPeak { get; private set; }
     public float SystemPeak { get; private set; }
     /// <summary>Raised (any thread) when a stream fails mid-recording, e.g. a device was unplugged.</summary>
@@ -76,6 +78,12 @@ public sealed class Recorder
         _cursor = new StreamWriter(Path.Combine(_o.Dir, "cursor.raw.txt"));
         _hook = new MouseHook();
         _hook.Event += OnMouse;
+        if (_o.Keys != null)
+        {
+            _keys = new StreamWriter(Path.Combine(_o.Dir, "keys.raw.txt"));
+            _keyHook = new KeyHook(_o.Keys);
+            _keyHook.Shortcut += combo => { if (!_paused) _keys.WriteLine(KeyLog.Format(new KeyEvent(Elapsed, combo))); };
+        }
 
         StartVideo();
 
@@ -219,6 +227,7 @@ public sealed class Recorder
     public async Task<string> StopAsync()
     {
         _hook?.Dispose();
+        _keyHook?.Dispose();
         if (!_paused) await StopVideoAsync();
         _stopping = true;
         _mic?.StopRecording();
@@ -228,6 +237,7 @@ public sealed class Recorder
         _micW?.Dispose(); _sysW?.Dispose();
         _mic?.Dispose(); _sys?.Dispose(); _silence?.Dispose();
         _cursor?.Dispose();
+        _keys?.Dispose();
 
         await FinalizeAsync();
         return _o.Dir;
@@ -266,6 +276,16 @@ public sealed class Recorder
             .Where(l => l != null).ToList();
         File.WriteAllLines(Path.Combine(_o.Dir, _m.Cursor), lines!);
         File.Delete(raw);
+
+        if (_keys != null)
+        {
+            var rawKeys = Path.Combine(_o.Dir, "keys.raw.txt");
+            File.WriteAllLines(Path.Combine(_o.Dir, "keys.txt"), File.ReadLines(rawKeys)
+                .Select(l => KeyLog.TryParse(l, out var k) && Parts.ToVideoTime(parts, k.T) is { } vt ? KeyLog.Format(k with { T = vt }) : null)
+                .OfType<string>());
+            File.Delete(rawKeys);
+            _m.Keys = "keys.txt";
+        }
 
         _m.Complete = true;
         _m.Save(_o.Dir);

@@ -46,6 +46,7 @@ public partial class EditorWindow : Window
         _m = SessionManifest.Load(_sessionDir);
         _cursor = _m.LoadCursor(_sessionDir);
         _clicks = _cursor.Where(c => c.K != CursorKind.Move).ToList();
+        LoadKeys();
         _duration = Math.Max(P.Segments.Max(s => s.End), 0.1);
         _view = TimelineView.Fit(_duration);
         ZoomHost.Width = ScreenMedia.Width = _m.Width;
@@ -176,6 +177,7 @@ public partial class EditorWindow : Window
         RedoBtn.IsEnabled = _history.CanRedo;
         RefreshText();
         RefreshAnnotations();
+        RefreshKeys();
         Title = $"{(_dirty ? "• " : "")}{App.Product} — Editor";
         _refreshing = false;
         DrawTimeline();
@@ -252,6 +254,7 @@ public partial class EditorWindow : Window
 
         ApplyText(t);
         ApplyAnnotations(t);
+        ApplyKeys(t);
         TimeText.Text = $"{Fmt(t)} / {Fmt(_duration)}";
         var w = Timeline.ActualWidth;
         // Follow only while playing, so scrolling away by hand doesn't snap back.
@@ -390,6 +393,7 @@ public partial class EditorWindow : Window
         DrawTextRows();
         DrawAnnotationRow();
         DrawAudioRow();
+        DrawKeyMarkers(X);
 
         foreach (var c in _clicks)
             if (c.T >= _view.Start && c.T <= _view.End)
@@ -639,6 +643,7 @@ public partial class EditorWindow : Window
         {
             Project = project, Manifest = _m, SessionDir = _sessionDir, Cursor = _cursor, OutputPath = dlg.FileName, TempDir = temp,
             AnnotationImages = fmt == ExportFormat.Wav ? [] : RenderAnnotationImages(temp),
+            Keys = _keyEvents, KeyImages = fmt == ExportFormat.Wav ? [] : RenderKeyImages(project, temp),
             Details = fmt switch
             {
                 ExportFormat.Wav => $"WAV · {Fmt(project.OutputDuration)}",

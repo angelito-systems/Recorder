@@ -31,6 +31,8 @@ public sealed class SessionManifest
     public string? SystemAudio { get; set; }
     public double SystemAudioOffset { get; set; }
     public string Cursor { get; set; } = "cursor.txt";
+    /// <summary>Allowed shortcuts only ("t Ctrl+S" per line); null when the keystroke overlay was off.</summary>
+    public string? Keys { get; set; }
 
     internal static readonly JsonSerializerOptions Json = new()
     {
@@ -55,6 +57,17 @@ public sealed class SessionManifest
         {
             if (CursorLog.TryParse(line, out var e)) list.Add(e with { T = e.T - ScreenOffset });
         }
+        return list;
+    }
+
+    /// <summary>Shortcuts in screen-video time.</summary>
+    public List<KeyEvent> LoadKeys(string dir)
+    {
+        var list = new List<KeyEvent>();
+        var path = Keys == null ? null : Path.Combine(dir, Keys);
+        if (path == null || !File.Exists(path)) return list;
+        foreach (var line in File.ReadLines(path))
+            if (KeyLog.TryParse(line, out var e)) list.Add(e with { T = e.T - ScreenOffset });
         return list;
     }
 }

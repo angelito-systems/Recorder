@@ -37,7 +37,10 @@
             <ProgressBar x:Name="SysMeter" Grid.Row="1" Grid.Column="1" Height="6" Maximum="1" VerticalAlignment="Center"/>
         </Grid>
         <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0"
-                   Text="Se registran la posición y los clics del ratón para editar zoom y efectos después. El teclado no se registra."/>
+                   Text="Se registran la posición y los clics del ratón para editar zoom y efectos después."/>
+        <CheckBox x:Name="KeysBox" Content="Mostrar atajos de teclado" Margin="0,10,0,0"/>
+        <TextBlock Style="{StaticResource Hint}" Margin="22,2,0,0"
+                   Text="Solo se guardan combinaciones de una lista permitida (Ctrl+S, Alt+Tab…). Nunca texto escrito ni contraseñas; se ignoran los gestores de contraseñas. Ctrl+Mayús+F12 suspende o reanuda al instante."/>
 
         <Grid Margin="0,20,0,0">
             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
