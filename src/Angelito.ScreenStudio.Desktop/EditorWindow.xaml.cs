@@ -25,6 +25,7 @@ public partial class EditorWindow : Window
     private double _duration;
     private bool _refreshing = true; // until the first Refresh, control events fire from InitializeComponent
     private bool _playing, _dirty, _scrubbing, _camDragging;
+    private int _playSeg = -1; // clip being played, as an index into P.Segments
     private int _selectedZoom = -1;
     private string? _lastEditKey;
     private DateTime _lastEditAt;
@@ -211,14 +212,16 @@ public partial class EditorWindow : Window
         var t = Now;
         if (_playing)
         {
-            var seg = P.Segments.FirstOrDefault(s => t >= s.Start - 0.02 && t < s.End);
-            if (seg == null)
+            // Clips play in list (output) order, which may differ from source order.
+            var next = P.PlaybackSegment(_playSeg, t);
+            if (next < 0) Pause();
+            else if (next != _playSeg || t < P.Segments[next].Start - 0.05)
             {
-                // Inside a removed range: jump to the next kept segment, or stop at the end.
-                var next = P.Segments.Where(s => s.Start > t).OrderBy(s => s.Start).FirstOrDefault();
-                if (next == null) Pause(); else Seek(next.Start, keepPlaying: true);
+                var s = P.Segments[next];
+                if (t < s.Start - 0.02 || t >= s.End) Seek(s.Start, keepPlaying: true);
                 t = Now;
             }
+            _playSeg = next;
             Sync(t, false);
         }
         ApplyVisuals(t);
@@ -301,7 +304,9 @@ public partial class EditorWindow : Window
 
     private void Play()
     {
-        if (Now >= P.Segments.Max(s => s.End) - 0.05) Seek(P.Segments[0].Start);
+        var last = P.Segments[^1];
+        if (Now >= last.End - 0.05 && Now <= last.End + 0.5) Seek(P.Segments[0].Start); // at the end of the output: restart
+        _playSeg = -1;
         _playing = true;
         ScreenMedia.Play();
         PlayBtn.Content = "❚❚";
@@ -411,6 +416,8 @@ public partial class EditorWindow : Window
 
     private void OnSplit(object sender, RoutedEventArgs e) => Commit(P.SplitAt(Now), "split" + Guid.NewGuid());
     private void OnDeleteSegment(object sender, RoutedEventArgs e) => Commit(P.DeleteAt(Now), "del" + Guid.NewGuid());
+    private void OnMoveClipEarlier(object sender, RoutedEventArgs e) => Commit(P.MoveSegment(Now, -1), "move" + Guid.NewGuid());
+    private void OnMoveClipLater(object sender, RoutedEventArgs e) => Commit(P.MoveSegment(Now, +1), "move" + Guid.NewGuid());
 
     private void OnAutoZoom(object sender, RoutedEventArgs e)
     {
@@ -577,6 +584,8 @@ public partial class EditorWindow : Window
             case Key.Delete: OnDeleteSegment(this, e); break;
             case Key.Z when ctrl: OnUndo(this, e); break;
             case Key.Y when ctrl: OnRedo(this, e); break;
+            case Key.Left when ctrl: OnMoveClipEarlier(this, e); break;
+            case Key.Right when ctrl: OnMoveClipLater(this, e); break;
             case Key.Left: Seek(Now - frame); RevealPlayhead(); break;
             case Key.Right: Seek(Now + frame); RevealPlayhead(); break;
             case Key.OemPlus or Key.Add when ctrl: ZoomTimeline(1.5); break;

@@ -46,6 +46,14 @@ public partial class EditorWindow
     {
         if (r is Row.Text or Row.Annotation) return (0, _duration);
         var items = Items(r);
+        if (r == Row.Segment)
+        {
+            // Clips may be reordered, so their source-time neighbours aren't list neighbours: no clip may overlap another's source range.
+            var (s, e) = items[i];
+            var others = items.Where((_, k) => k != i).ToList();
+            return (others.Where(o => o.E <= s + 1e-6).Select(o => o.E).DefaultIfEmpty(0).Max(),
+                    others.Where(o => o.S >= e - 1e-6).Select(o => o.S).DefaultIfEmpty(_duration).Min());
+        }
         return (i > 0 ? items[i - 1].E : 0, i < items.Count - 1 ? items[i + 1].S : _duration);
     }
 
