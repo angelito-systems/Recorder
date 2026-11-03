@@ -1,0 +1,23 @@
+name: Error
+description: Algo no funciona como debería
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Qué pasó
+      description: Qué hiciste, qué esperabas y qué ocurrió.
+    validations: { required: true }
+  - type: textarea
+    id: diag
+    attributes:
+      label: Diagnóstico
+      description: Pega el texto de *Acerca de → Copiar diagnóstico* (versión, Windows, GPU, FFmpeg).
+      render: text
+    validations: { required: true }
+  - type: textarea
+    id: log
+    attributes:
+      label: Registro (opcional)
+      description: Las últimas líneas de incidents.log (Acerca de → Abrir carpeta de registros), si las hay.
+      render: text
