@@ -6,6 +6,16 @@ namespace Angelito.ScreenStudio.Core;
 /// <summary>Placement math shared by the editor preview and the exporter.</summary>
 public static class Layout
 {
+    /// <summary>Where the screen card sits on an ow×oh output with this background: even size, centered, corner radius.</summary>
+    public static (int X, int Y, int W, int H, int R) ScreenRect(int ow, int oh, BackgroundStyle bg)
+    {
+        if (!bg.Enabled) return (0, 0, ow, oh, 0);
+        var k = 1 - 2 * Math.Clamp(bg.Padding, 0, 0.3);
+        int w = Even(ow * k), h = Even(oh * k);
+        var r = (int)Math.Round(Math.Clamp(bg.Radius, 0, 0.2) * Math.Min(ow, oh));
+        return ((ow - w) / 2, (oh - h) / 2, w, h, Math.Min(r, Math.Min(w, h) / 2));
+    }
+
     /// <summary>Fade-in/out length for texts, subtitles and shortcuts; at most half of a short item.</summary>
     public static double FadeLength(double start, double end) => Math.Min(0.2, (end - start) / 2);
 
@@ -135,6 +145,22 @@ public static class Exporter
                 g.Append(F($"scale={ow}:{oh}:flags=bicubic,setsar=1[vz];\n"));
             }
             last = "vz";
+
+            // Background: the screen as a rounded card on a gradient. Mask and gradient are computed once and repeated
+            // for exactly the stream's frame count (an endless loop would never let ffmpeg finish).
+            if (p.Background.Enabled)
+            {
+                var (bx, by, bw, bh, br) = Layout.ScreenRect(ow, oh, p.Background);
+                var frames = (int)Math.Ceiling(srcEnd * fps) + 1;
+                var (r1, g1, b1) = ParseColor(p.Background.Color1);
+                var (r2, g2, b2) = ParseColor(p.Background.Color2);
+                var mask = br > 0 ? F($"if(lte(hypot(max(abs(X-W/2)-(W/2-{br}),0),max(abs(Y-H/2)-(H/2-{br}),0)),{br}),255,0)") : "255";
+                g.Append(F($"[vz]scale={bw}:{bh}:flags=bicubic,format=yuva420p[bgs];"));
+                g.Append(F($"color=black:s={bw}x{bh}:r={fps}:d={1.0 / fps:F4},format=gray,geq=lum='{mask}',loop=loop={frames}:size=1[bgm];[bgs][bgm]alphamerge[bgf];"));
+                g.Append(F($"gradients=s={ow}x{oh}:c0=0x{r1:X2}{g1:X2}{b1:X2}:c1=0x{r2:X2}{g2:X2}{b2:X2}:x0=0:y0=0:x1={ow}:y1={oh}:nb_colors=2:speed=0:r={fps},trim=end_frame=1,loop=loop={frames}:size=1[bgg];"));
+                g.Append(F($"[bgg][bgf]overlay={bx}:{by}:shortest=1,format=yuv420p,setsar=1[vbg];\n"));
+                last = "vbg";
+            }
 
             if (m.Webcam != null && p.Webcam.Visible && File.Exists(Path.Combine(sessionDir, m.Webcam)))
             {

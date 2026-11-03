@@ -65,7 +65,7 @@ public partial class EditorWindow
     {
         if (FindName(page) is not FrameworkElement target) return;
         _page = page;
-        foreach (var name in new[] { "PageZoom", "PageCursor", "PageCamera", "PageAudio", "PageText", "PageSubs", "PageAnn", "PageKeys", "PageFormat", "PageExport" })
+        foreach (var name in new[] { "PageZoom", "PageCursor", "PageCamera", "PageAudio", "PageText", "PageSubs", "PageAnn", "PageKeys", "PageBackground", "PageFormat", "PageExport" })
             if (FindName(name) is FrameworkElement el) el.Visibility = name == page ? Visibility.Visible : Visibility.Collapsed;
         PageTitle.Text = target.Tag as string;
         if (FindName("Rail" + page[4..]) is RadioButton r && r.IsChecked != true) r.IsChecked = true;
