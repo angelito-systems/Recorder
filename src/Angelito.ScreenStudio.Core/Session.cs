@@ -77,6 +77,43 @@ public static class CursorLog
     }
 }
 
+/// <summary>
+/// A stretch of screen video recorded between start/resume and pause/stop. Start is in session seconds;
+/// Duration is the part file's real length. Parts played back-to-back define video time.
+/// </summary>
+public sealed record RecordedPart(double Start, double Duration);
+
+public static class Parts
+{
+    /// <summary>Session time → video time, or null if t falls in a pause.</summary>
+    public static double? ToVideoTime(IReadOnlyList<RecordedPart> parts, double t)
+    {
+        double acc = 0;
+        foreach (var p in parts)
+        {
+            if (t >= p.Start && t < p.Start + p.Duration) return acc + t - p.Start;
+            acc += p.Duration;
+        }
+        return null;
+    }
+
+    /// <summary>filter_complex ([0:a] → [out]) keeping only the recorded parts of a stream that started <paramref name="offset"/> s into the session.</summary>
+    public static string AudioFilter(IReadOnlyList<RecordedPart> parts, double offset)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var n = parts.Count;
+        // adelay + apad put the audio on session time, so every part can be cut sample-accurately and is never short.
+        var g = new System.Text.StringBuilder(string.Create(inv, $"[0:a]adelay={offset * 1000:F0}:all=1,apad,asplit={n}"));
+        for (var i = 0; i < n; i++) g.Append($"[s{i}]");
+        g.Append(';');
+        for (var i = 0; i < n; i++)
+            g.Append(string.Create(inv, $"[s{i}]atrim=start={parts[i].Start:F4}:end={parts[i].Start + parts[i].Duration:F4},asetpts=PTS-STARTPTS[p{i}];"));
+        for (var i = 0; i < n; i++) g.Append($"[p{i}]");
+        g.Append($"concat=n={n}:v=0:a=1[out]");
+        return g.ToString();
+    }
+}
+
 public static class AtomicFile
 {
     /// <summary>Write to a temp file then replace, keeping the previous version as .bak — a crash never leaves a half-written file.</summary>

@@ -18,6 +18,12 @@
             </ComboBox>
         </Grid>
 
+        <DockPanel Margin="0,8,0,0">
+            <Button x:Name="RegionBtn" DockPanel.Dock="Right" Content="Seleccionar región…" Click="OnRegion"/>
+            <Button x:Name="FullBtn" DockPanel.Dock="Right" Content="Completa" Click="OnFullScreen" Margin="0,0,6,0" Visibility="Collapsed"/>
+            <TextBlock x:Name="AreaText" VerticalAlignment="Center" Text="Pantalla completa"/>
+        </DockPanel>
+
         <TextBlock Style="{StaticResource Section}" Text="Cámara"/>
         <ComboBox x:Name="CamBox" ToolTip="Se graba como pista separada, editable después"/>
 
@@ -34,10 +40,12 @@
                    Text="Se registran la posición y los clics del ratón para editar zoom y efectos después. El teclado no se registra."/>
 
         <Grid Margin="0,20,0,0">
-            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <Button x:Name="PauseBtn" Grid.Column="1" Margin="8,0,0,0" Padding="14,0" Content="❚❚ Pausar" Click="OnPause" Visibility="Collapsed"
+                    ToolTip="Mientras está en pausa no se captura pantalla, cámara, cursor ni audio"/>
             <Button x:Name="RecordBtn" Height="44" FontSize="15" Click="OnRecord" IsEnabled="False"
                     Background="{StaticResource Rec}" Foreground="White" Content="● Grabar"/>
-            <Button Grid.Column="1" Margin="8,0,0,0" Padding="12,0" Content="Abrir proyecto…" Click="OnOpen"/>
+            <Button x:Name="OpenBtn" Grid.Column="2" Margin="8,0,0,0" Padding="12,0" Content="Abrir proyecto…" Click="OnOpen"/>
         </Grid>
         <TextBlock x:Name="Timer" HorizontalAlignment="Center" FontSize="28" FontFamily="Cascadia Mono, Consolas"
                    Margin="0,12,0,0" Visibility="Collapsed" Text="00:00:00"/>

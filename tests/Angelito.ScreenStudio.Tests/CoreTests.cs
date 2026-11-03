@@ -118,6 +118,34 @@ public class ProjectTests
     }
 }
 
+public class PartsTests
+{
+    private static readonly List<RecordedPart> P = [new(0.2, 3), new(5, 2)];
+
+    [Fact]
+    public void MapsSessionTimeAcrossPauses()
+    {
+        Assert.Null(Parts.ToVideoTime(P, 0.1));
+        Assert.Equal(0.8, Parts.ToVideoTime(P, 1.0)!.Value, 6);
+        Assert.Null(Parts.ToVideoTime(P, 4)); // paused
+        Assert.Equal(3.5, Parts.ToVideoTime(P, 5.5)!.Value, 6);
+        Assert.Null(Parts.ToVideoTime(P, 7.1));
+    }
+
+    [Fact]
+    public async Task AudioFilterKeepsOnlyRecordedParts()
+    {
+        var dir = Directory.CreateTempSubdirectory("ass-parts").FullName;
+        var src = Path.Combine(dir, "a.wav");
+        var dst = Path.Combine(dir, "b.wav");
+        Assert.Equal(0, (await FfmpegProcess.RunAsync(["-y", "-f", "lavfi", "-i", "sine=d=8", src])).Code);
+        // audio started 0.5 s into the session → its first 0.3 s of part 1 are padded silence
+        var (code, log) = await FfmpegProcess.RunAsync(["-y", "-i", src, "-filter_complex", Parts.AudioFilter(P, 0.5), "-map", "[out]", dst]);
+        Assert.True(code == 0, log);
+        Assert.Equal(5.0, await FfmpegProcess.ProbeDurationAsync(dst), 1);
+    }
+}
+
 /// <summary>Runs the real exporter against a synthetic session made with ffmpeg test sources.</summary>
 public class ExportIntegrationTests
 {

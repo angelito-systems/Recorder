@@ -16,6 +16,7 @@ public partial class RecorderWindow : Window
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly Dictionary<int, Task<EncoderChoice>> _screenEnc = new();
     private Task<EncoderChoice>? _cpuEnc;
+    private Region? _region;
 
     public RecorderWindow()
     {
@@ -35,6 +36,7 @@ public partial class RecorderWindow : Window
             _cpuEnc = EncoderProbe.ForExportAsync();
             MonitorBox.ItemsSource = await monitors;
             MonitorBox.SelectedIndex = 0;
+            MonitorBox.SelectionChanged += (_, _) => OnFullScreen(this, new RoutedEventArgs());
             CamBox.ItemsSource = new[] { NoCam }.Concat(await cams).ToList();
             CamBox.SelectedIndex = 0;
             if (MonitorBox.Items.Count == 0) { Status.Text = "No se encontró ninguna pantalla que se pueda capturar."; return; }
@@ -63,7 +65,7 @@ public partial class RecorderWindow : Window
             var mon = (MonitorInfo)MonitorBox.SelectedItem;
             var cam = CamBox.SelectedItem as string;
             var dir = Path.Combine(App.RecordingsDir, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
-            _rec = new Recorder(new RecordOptions(mon, int.Parse((string)((ComboBoxItem)FpsBox.SelectedItem).Tag), cam == NoCam ? null : cam,
+            _rec = new Recorder(new RecordOptions(mon, _region, int.Parse((string)((ComboBoxItem)FpsBox.SelectedItem).Tag), cam == NoCam ? null : cam,
                 MicBox.IsChecked == true, SysBox.IsChecked == true, await ScreenEncoder(mon), await _cpuEnc!, dir));
             _rec.Warning += msg => Dispatcher.BeginInvoke(() => { App.Log(msg); Status.Text = msg; });
             _rec.Start();
@@ -108,17 +110,54 @@ public partial class RecorderWindow : Window
         RecordBtn.IsEnabled = true;
         RecordBtn.Content = on ? "■ Detener" : "● Grabar";
         Timer.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        MonitorBox.IsEnabled = CamBox.IsEnabled = FpsBox.IsEnabled = MicBox.IsEnabled = SysBox.IsEnabled = !on;
+        MonitorBox.IsEnabled = CamBox.IsEnabled = FpsBox.IsEnabled = MicBox.IsEnabled = SysBox.IsEnabled = RegionBtn.IsEnabled = FullBtn.IsEnabled = OpenBtn.IsEnabled = !on;
+        PauseBtn.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        PauseBtn.IsEnabled = true;
+        PauseBtn.Content = "❚❚ Pausar";
         if (on) _tick.Start(); else { _tick.Stop(); MicMeter.Value = SysMeter.Value = 0; }
     }
 
     private void UpdateMeters()
     {
         if (_rec == null) return;
-        Timer.Text = TimeSpan.FromSeconds(_rec.Elapsed).ToString(@"hh\:mm\:ss");
+        Timer.Text = TimeSpan.FromSeconds(_rec.Recorded).ToString(@"hh\:mm\:ss") + (_rec.IsPaused ? "  en pausa" : "");
         MicMeter.Value = _rec.MicPeak;
         SysMeter.Value = _rec.SystemPeak;
         MicMeter.Foreground = _rec.MicPeak > 0.98f ? (System.Windows.Media.Brush)FindResource("Rec") : (System.Windows.Media.Brush)FindResource("Brand");
+    }
+
+    private async void OnPause(object sender, RoutedEventArgs e)
+    {
+        if (_rec == null) return;
+        PauseBtn.IsEnabled = RecordBtn.IsEnabled = false;
+        try
+        {
+            if (_rec.IsPaused) { _rec.Resume(); PauseBtn.Content = "❚❚ Pausar"; }
+            else { await _rec.PauseAsync(); PauseBtn.Content = "▶ Reanudar"; }
+        }
+        catch (Exception ex)
+        {
+            App.Log(ex.ToString());
+            Status.Text = "No se pudo pausar/reanudar: " + ex.Message;
+        }
+        PauseBtn.IsEnabled = RecordBtn.IsEnabled = true;
+    }
+
+    private void OnRegion(object sender, RoutedEventArgs e)
+    {
+        if (MonitorBox.SelectedItem is not MonitorInfo mon) return;
+        var w = new RegionWindow(mon);
+        if (w.ShowDialog() != true || w.Result is not { } r) return;
+        _region = r;
+        AreaText.Text = $"Región {r.Width & ~1}×{r.Height & ~1} en ({r.X}, {r.Y})";
+        FullBtn.Visibility = Visibility.Visible;
+    }
+
+    private void OnFullScreen(object sender, RoutedEventArgs e)
+    {
+        _region = null;
+        AreaText.Text = "Pantalla completa";
+        FullBtn.Visibility = Visibility.Collapsed;
     }
 
     private void OnOpen(object sender, RoutedEventArgs e)

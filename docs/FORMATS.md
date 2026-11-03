@@ -5,10 +5,11 @@
 | Archivo | Contenido |
 |---|---|
 | `session.json` | Manifiesto: tamaño, FPS, nombre y offset (s desde el inicio de la sesión) de cada stream, `complete`. Se escribe al empezar (`complete: false`) y al terminar. |
-| `screen.mp4` | Pantalla, H.264, cursor del sistema incluido. Se graba como `.mkv` (resiste cierres inesperados) y se remuxa a MP4 al detener. Si el remux falla se conserva el `.mkv`. |
-| `webcam.mp4` | Cámara, opcional. |
-| `mic.wav`, `system.wav` | Audio PCM float de WASAPI, opcionales. |
-| `cursor.txt` | Una línea por evento: `t x y k` — `t` segundos desde el inicio de la sesión, `x y` píxeles relativos a la pantalla capturada, `k` 0=movimiento 1=izq 2=der 3=medio. Sin teclado. |
+| `screen.mp4` | Pantalla (completa o región), H.264, cursor del sistema incluido. Se graba en tramos `screen_N.mkv` (uno por cada inicio/reanudación; resisten cierres inesperados) que al detener se unen sin re-codificar. |
+| `webcam.mp4` | Cámara, opcional. Con un solo tramo se remuxa y conserva su offset; con pausas, cada tramo se recorta a la ventana de su tramo de pantalla y se re-codifica una vez. |
+| `mic.wav`, `system.wav` | Audio PCM float de WASAPI, opcionales. Se graban continuos (`*.raw.wav`, silencio durante la pausa) y al detener se recortan exactamente a los tramos de video. |
+| `cursor.txt` | Una línea por evento: `t x y k` — `t` segundos en tiempo del video final (las pausas no existen), `x y` píxeles relativos al área capturada, `k` 0=movimiento 1=izq 2=der 3=medio. Sin teclado. |
+| `session.json` tras detener | Todos los offsets quedan en 0 (salvo la cámara de un solo tramo): el editor ve una única línea de tiempo. Si la finalización falla, los tramos y archivos `.raw` se conservan. |
 | `proyecto.angelstudio` | Proyecto creado automáticamente al terminar. |
 
 ## Proyecto `.angelstudio` (JSON, `formatVersion: 1`)
