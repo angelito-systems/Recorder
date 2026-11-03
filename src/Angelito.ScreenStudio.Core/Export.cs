@@ -224,9 +224,18 @@ public static class Exporter
         for (var i = 0; i < k; i++) g.Append((video ? $"[k{i}]" : "") + (audioOut ? $"[ka{i}]" : ""));
         g.Append(F($"concat=n={k}:v={(video ? 1 : 0)}:a={(audioOut ? 1 : 0)}{(video ? "[vout]" : "")}{(audioOut ? "[aout]" : "")}"));
 
+        // Soft subtitle track (players can toggle it), in output time; added alongside any burned-in copy.
+        var srt = fmt is ExportFormat.Png or ExportFormat.Wav ? "" : p.ExportSrt();
+        if (srt.Length > 0)
+        {
+            var srtPath = Path.ChangeExtension(graphPath, ".subs.srt");
+            files[srtPath] = srt;
+            args.AddRange(["-i", srtPath]);
+        }
         args.AddRange(["-/filter_complex", graphPath]);
         if (video) args.AddRange(["-map", "[vout]"]);
         if (audioOut) args.AddRange(["-map", "[aout]"]);
+        if (srt.Length > 0) args.AddRange(["-map", $"{input}:s", "-c:s", fmt == ExportFormat.MkvH264 ? "srt" : "mov_text"]);
         switch (fmt)
         {
             case ExportFormat.Wav: args.AddRange(["-c:a", "pcm_s16le", outPath]); break;
