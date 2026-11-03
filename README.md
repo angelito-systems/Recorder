@@ -1,6 +1,6 @@
 # Angelito Screen Studio Pro
 
-[![ci](https://github.com/angelito-systems/Recorder/actions/workflows/ci.yml/badge.svg)](https://github.com/angelito-systems/Recorder/actions/workflows/ci.yml)
+[![ci](https://github.com/angelitosystems/Recorder/actions/workflows/ci.yml/badge.svg)](https://github.com/angelitosystems/Recorder/actions/workflows/ci.yml)
 [![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
 
 Grabador y editor de pantalla para Windows 10/11 — Angelito Systems S.A.C. · https://angelitosystems.net
