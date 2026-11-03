@@ -10,6 +10,8 @@
 | `mic.wav`, `system.wav` | Audio PCM float de WASAPI, opcionales. Se graban continuos (`*.raw.wav`, silencio durante la pausa) y al detener se recortan exactamente a los tramos de video. |
 | `keys.txt` | Solo si se activó el visualizador: `t combinación` por línea (p. ej. `2.7644 Ctrl+S`) en tiempo del video. Únicamente combinaciones de la lista permitida; nunca texto, letras sueltas, Mayús+letra ni AltGr. |
 | `cursor.txt` | Una línea por evento: `t x y k` — `t` segundos en tiempo del video final (las pausas no existen), `x y` píxeles relativos al área capturada, `k` 0=movimiento 1=izq 2=der 3=medio. Sin teclado. |
+| `session.json` → `recording` | Diario mientras se graba: tramos (archivo e inicio de pantalla/cámara, fin), offsets de audio y qué flujos hay. Se actualiza en cada cambio, de modo que una sesión interrumpida se puede finalizar después solo con lo que hay en disco. Se borra al terminar. |
+| `recording.lock` | Abierto en exclusiva mientras se graba; el sistema lo libera si el proceso muere. Evita "recuperar" una grabación en curso. |
 | `session.json` tras detener | Todos los offsets quedan en 0 (salvo la cámara de un solo tramo): el editor ve una única línea de tiempo. Si la finalización falla, los tramos y archivos `.raw` se conservan. |
 | `.cache\` | Miniaturas (`thumbs-*`, JPG cada 2 s o más, máx. ~600) y picos de audio (`peaks-*`, 100 por segundo, 1 byte). Se regeneran si el medio es más nuevo; se pueden borrar sin perder nada. |
 | `proyecto.angelstudio` | Proyecto creado automáticamente al terminar. |

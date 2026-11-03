@@ -28,7 +28,7 @@ public partial class EditorWindow : Window
     private int _selectedZoom = -1;
     private string? _lastEditKey;
     private DateTime _lastEditAt;
-    private readonly DispatcherTimer _autosave = new() { Interval = TimeSpan.FromSeconds(20) };
+    private readonly DispatcherTimer _autosave = new() { Interval = TimeSpan.FromSeconds(5) }; // a crash loses at most ~5 s of edits
     private readonly List<Ellipse> _rings = [];
     private readonly Line _playhead = new() { Stroke = Brushes.White, StrokeThickness = 2, IsHitTestVisible = false };
 
@@ -588,6 +588,7 @@ public partial class EditorWindow : Window
         try
         {
             P.Save(_path);
+            Snapshot();
             _dirty = false;
             Title = $"{App.Product} — Editor";
         }

@@ -33,7 +33,8 @@
         <DockPanel Margin="12,8">
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                 <Button Content="Abrir…" Click="OnOpen" ToolTip="Abrir proyecto (Ctrl+O)"/>
-                <Button Content="Guardar" Click="OnSave" Margin="6,0,0,0" ToolTip="Guardar (Ctrl+S) — también se guarda automáticamente"/>
+                <Button Content="Guardar" Click="OnSave" Margin="6,0,0,0" ToolTip="Guardar (Ctrl+S) — también se guarda automáticamente cada pocos segundos"/>
+                <Button Content="Versiones…" Click="OnVersions" Margin="6,0,0,0" ToolTip="Restaurar una versión anterior guardada automáticamente"/>
                 <Button x:Name="UndoBtn" Content="↶" Click="OnUndo" Margin="16,0,0,0" ToolTip="Deshacer (Ctrl+Z)" Width="38"/>
                 <Button x:Name="RedoBtn" Content="↷" Click="OnRedo" Margin="6,0,0,0" ToolTip="Rehacer (Ctrl+Y)" Width="38"/>
                 <Button Content="Dividir" Click="OnSplit" Margin="16,0,0,0" ToolTip="Dividir en el cabezal (S)"/>

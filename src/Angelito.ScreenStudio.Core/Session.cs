@@ -34,6 +34,9 @@ public sealed class SessionManifest
     /// <summary>Allowed shortcuts only ("t Ctrl+S" per line); null when the keystroke overlay was off.</summary>
     public string? Keys { get; set; }
 
+    /// <summary>Written continuously while recording so an interrupted session can be finalized later; null once complete.</summary>
+    public RecordingJournal? Recording { get; set; }
+
     internal static readonly JsonSerializerOptions Json = new()
     {
         WriteIndented = true,
@@ -88,6 +91,27 @@ public static class CursorLog
         e = new CursorEvent(t, x, y, (CursorKind)k);
         return true;
     }
+}
+
+/// <summary>One start/resume…pause/stop stretch while recording. Times are session seconds; null until known.</summary>
+public sealed class JournalPart
+{
+    public string Screen { get; set; } = "";
+    public double? ScreenStart { get; set; }
+    public string? Webcam { get; set; }
+    public double? WebcamStart { get; set; }
+    public double? Stop { get; set; }
+}
+
+/// <summary>What a recording has produced so far: enough to finalize it without the process that made it.</summary>
+public sealed class RecordingJournal
+{
+    public List<JournalPart> Parts { get; set; } = [];
+    public bool Mic { get; set; }
+    public bool SystemAudio { get; set; }
+    public bool Keys { get; set; }
+    public double? MicOffset { get; set; }
+    public double? SystemOffset { get; set; }
 }
 
 /// <summary>

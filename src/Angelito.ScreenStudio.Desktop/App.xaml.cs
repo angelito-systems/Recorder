@@ -15,6 +15,9 @@ public partial class App : Application
     {
         Directory.CreateDirectory(DataDir);
         DispatcherUnhandledException += OnUnhandled;
+        // Background-thread failures can't be recovered in-process; log them (no user content) for diagnosis.
+        AppDomain.CurrentDomain.UnhandledException += (_, ev) => Log("fatal: " + ev.ExceptionObject);
+        TaskScheduler.UnobservedTaskException += (_, ev) => { Log("task: " + ev.Exception); ev.SetObserved(); };
         base.OnStartup(e);
         // A project path argument (e.g. double-clicking a .angelstudio) opens the editor directly.
         if (e.Args.Length == 1 && File.Exists(e.Args[0])) new EditorWindow(e.Args[0]).Show();

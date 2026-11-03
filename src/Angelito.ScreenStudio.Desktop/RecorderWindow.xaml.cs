@@ -24,7 +24,7 @@ public partial class RecorderWindow : Window
         _tick.Tick += (_, _) => UpdateMeters();
         // Keep the recorder visible to the user but out of the captured video.
         SourceInitialized += (_, _) => Native.SetWindowDisplayAffinity(new WindowInteropHelper(this).Handle, Native.WDA_EXCLUDEFROMCAPTURE);
-        Loaded += async (_, _) => await DetectAsync();
+        Loaded += async (_, _) => { await RecoverInterruptedAsync(); await DetectAsync(); };
     }
 
     private async Task DetectAsync()
@@ -49,6 +49,49 @@ public partial class RecorderWindow : Window
             Status.Text = ex.Message;
             App.Log(ex.ToString());
         }
+    }
+
+    /// <summary>Editable project for a finished session folder (kept if one already exists, e.g. after a recovery).</summary>
+    private static async Task<string> CreateProjectAsync(string dir)
+    {
+        var path = Path.Combine(dir, "proyecto" + StudioProject.Extension);
+        if (File.Exists(path)) return path;
+        var m = SessionManifest.Load(dir);
+        var dur = await FfmpegProcess.ProbeDurationAsync(Path.Combine(dir, m.Screen));
+        StudioProject.FromSession(dur, m.LoadCursor(dir), m.Width, m.Height).Save(path);
+        return path;
+    }
+
+    /// <summary>Offers to finish recordings left behind by a crash or power cut; their files are never deleted on failure.</summary>
+    private async Task RecoverInterruptedAsync()
+    {
+        var found = SessionFinalizer.FindInterrupted(App.RecordingsDir);
+        if (found.Count == 0) return;
+        var names = string.Join("\n", found.Select(d => "• " + Path.GetFileName(d)));
+        if (MessageBox.Show(this, $"Se encontraron grabaciones que no se cerraron correctamente (por ejemplo, por un cierre inesperado o un corte de energía):\n\n{names}\n\n¿Recuperarlas ahora?",
+                App.Product, MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+
+        Status.Text = "Recuperando grabaciones…";
+        var enc = await EncoderProbe.ForExportAsync();
+        string? last = null;
+        var errors = new List<string>();
+        foreach (var dir in found)
+        {
+            try
+            {
+                await SessionFinalizer.FinalizeAsync(dir, SessionManifest.Load(dir), enc, w => App.Log($"recover {dir}: {w}"));
+                last = await CreateProjectAsync(dir);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"recover {dir}: {ex}");
+                errors.Add($"{Path.GetFileName(dir)}: {ex.Message.Split('\n')[0]}");
+            }
+        }
+        var ok = found.Count - errors.Count;
+        MessageBox.Show(this, $"Recuperadas: {ok} de {found.Count}." + (errors.Count > 0 ? "\n\nNo se pudieron recuperar (sus archivos se conservaron):\n" + string.Join("\n", errors) : ""),
+            App.Product, MessageBoxButton.OK, errors.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        if (last != null) new EditorWindow(last).Show();
     }
 
     private Task<EncoderChoice> ScreenEncoder(MonitorInfo m)
@@ -89,12 +132,7 @@ public partial class RecorderWindow : Window
         try
         {
             var dir = await _rec!.StopAsync();
-            var m = SessionManifest.Load(dir);
-            var dur = await FfmpegProcess.ProbeDurationAsync(Path.Combine(dir, m.Screen));
-            var project = StudioProject.FromSession(dur, m.LoadCursor(dir), m.Width, m.Height);
-            var path = Path.Combine(dir, "proyecto" + StudioProject.Extension);
-            project.Save(path);
-            new EditorWindow(path).Show();
+            new EditorWindow(await CreateProjectAsync(dir)).Show();
         }
         catch (Exception ex)
         {
