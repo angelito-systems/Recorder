@@ -20,79 +20,127 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+        <!-- Left rail: one icon per tool; the checked one fills the settings panel. -->
+        <Style x:Key="RailButton" TargetType="RadioButton">
+            <Setter Property="GroupName" Value="Rail"/>
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bg" CornerRadius="8" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#337C5CFA"/>
+                                <Setter Property="Foreground" Value="{StaticResource Brand}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="FontFamily" Value="{StaticResource Icons}"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+        </Style>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="5"/>
-            <RowDefinition Height="280" MinHeight="200"/>
+            <RowDefinition Height="260" MinHeight="180"/>
         </Grid.RowDefinitions>
 
-        <!-- Top bar -->
-        <DockPanel Margin="12,8">
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                <Button Content="Abrir…" Click="OnOpen" ToolTip="Abrir proyecto (Ctrl+O)"/>
-                <Button Content="Guardar" Click="OnSave" Margin="6,0,0,0" ToolTip="Guardar (Ctrl+S) — también se guarda automáticamente cada pocos segundos"/>
-                <Button Content="Versiones…" Click="OnVersions" Margin="6,0,0,0" ToolTip="Restaurar una versión anterior guardada automáticamente"/>
-                <Button x:Name="UndoBtn" Content="↶" Click="OnUndo" Margin="16,0,0,0" ToolTip="Deshacer (Ctrl+Z)" Width="38"/>
-                <Button x:Name="RedoBtn" Content="↷" Click="OnRedo" Margin="6,0,0,0" ToolTip="Rehacer (Ctrl+Y)" Width="38"/>
-                <Button Content="Dividir" Click="OnSplit" Margin="16,0,0,0" ToolTip="Dividir en el cabezal (S)"/>
-                <Button Content="Eliminar tramo" Click="OnDeleteSegment" Margin="6,0,0,0" ToolTip="Eliminar el tramo bajo el cabezal (Supr)"/>
-                <Button Content="◀ Clip" Click="OnMoveClipEarlier" Margin="6,0,0,0" ToolTip="Mover el clip bajo el cabezal un puesto antes en el video (Ctrl+←)"/>
-                <Button Content="Clip ▶" Click="OnMoveClipLater" Margin="4,0,0,0" ToolTip="Mover el clip bajo el cabezal un puesto después en el video (Ctrl+→)"/>
-                <ComboBox x:Name="ModeBox" Margin="16,0,0,0" Width="130" SelectionChanged="OnModeChanged" ToolTip="Simple: grabar, recortar, zoom y exportar. Avanzado: todas las herramientas. Cambiar de modo no modifica el proyecto.">
+        <!-- Top bar: project on the left, export on the right -->
+        <DockPanel Margin="12,8,12,8">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                <Image Source="Assets/app-256.png" Width="22" Height="22" Margin="2,0,10,0" RenderOptions.BitmapScalingMode="HighQuality"/>
+                <TextBlock x:Name="ProjectName" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="14" MaxWidth="320" TextTrimming="CharacterEllipsis" Margin="0,0,14,0"/>
+                <Button Style="{StaticResource IconButton}" Content="&#xE8E5;" Click="OnOpen" ToolTip="Abrir proyecto (Ctrl+O)" AutomationProperties.Name="Abrir proyecto"/>
+                <Button Style="{StaticResource IconButton}" Content="&#xE74E;" Click="OnSave" ToolTip="Guardar (Ctrl+S) — también se guarda automáticamente" AutomationProperties.Name="Guardar"/>
+                <Button Style="{StaticResource IconButton}" Content="&#xE81C;" Click="OnVersions" ToolTip="Versiones anteriores guardadas automáticamente" AutomationProperties.Name="Versiones"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                <ComboBox x:Name="ModeBox" Width="130" Margin="0,0,8,0" SelectionChanged="OnModeChanged" ToolTip="Simple: grabar, recortar, zoom y exportar. Avanzado: todas las herramientas. Cambiar de modo no modifica el proyecto.">
                     <ComboBoxItem Content="Modo simple"/>
                     <ComboBoxItem Content="Modo avanzado"/>
                 </ComboBox>
+                <Button Style="{StaticResource IconButton}" Content="&#xE946;" Click="OnAbout" ToolTip="Acerca de y diagnóstico" AutomationProperties.Name="Acerca de"/>
+                <Button Style="{StaticResource IconButton}" Content="&#xE8FD;" Click="OnShowQueue" ToolTip="Cola de exportaciones" AutomationProperties.Name="Cola de exportaciones"/>
+                <Button x:Name="ExportBtn" Style="{StaticResource AccentButton}" Click="OnExport" Margin="6,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE898;" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="Exportar"/>
+                    </StackPanel>
+                </Button>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                <Button Content="Acerca de" Click="OnAbout" Margin="0,0,8,0" ToolTip="Versión y diagnóstico"/>
-                <Button Content="Cola" Click="OnShowQueue" ToolTip="Ver exportaciones"/>
-                <Button x:Name="ExportBtn" Content="Exportar…" Style="{StaticResource AccentButton}" Click="OnExport" Margin="8,0,0,0"/>
-            </StackPanel>
-            <TextBlock x:Name="ProjectName" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.7"/>
+            <Border/>
         </DockPanel>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="56"/>
+                <ColumnDefinition Width="300" MinWidth="250"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width="320" MinWidth="260"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Preview: same layer order as the exporter -->
-            <Border Background="#0D0D12" Margin="12,0,0,0" CornerRadius="8" ClipToBounds="True">
-                <Viewbox Margin="12" Stretch="Uniform">
-                    <Grid x:Name="Stage" ClipToBounds="True" Background="Black" MouseLeftButtonDown="OnStageClick" MouseMove="OnStageMove" MouseLeftButtonUp="OnStageUp">
-                        <Canvas x:Name="ZoomHost" HorizontalAlignment="Left" VerticalAlignment="Top" MouseMove="OnAnnMove" MouseLeftButtonUp="OnAnnUp">
-                            <Canvas.RenderTransform><MatrixTransform x:Name="ZoomTransform"/></Canvas.RenderTransform>
-                            <MediaElement x:Name="ScreenMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Fill" IsMuted="True"/>
-                            <Canvas x:Name="AnnLayer"/>
-                            <Canvas x:Name="RingLayer" IsHitTestVisible="False"/>
-                            <Canvas x:Name="HandleLayer"/>
-                        </Canvas>
-                        <Border x:Name="CamFrame" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="SizeAll"
-                                MouseLeftButtonDown="OnCamDown" MouseMove="OnCamMove" MouseLeftButtonUp="OnCamUp">
-                            <MediaElement x:Name="CamMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Fill"
-                                          IsMuted="True" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                        </Border>
-                        <Canvas x:Name="TextLayer"/>
-                        <Canvas x:Name="KeyLayer"/>
-                    </Grid>
-                </Viewbox>
-            </Border>
-            <MediaElement x:Name="MicMedia" LoadedBehavior="Manual" Width="0" Height="0"/>
-            <MediaElement x:Name="SysMedia" LoadedBehavior="Manual" Width="0" Height="0"/>
+            <!-- Tool rail -->
+            <StackPanel Margin="8,0,8,0">
+                <RadioButton x:Name="RailZoom" Style="{StaticResource RailButton}" Tag="PageZoom" Checked="OnRail" ToolTip="Zoom" AutomationProperties.Name="Zoom">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE71E;" FontSize="18"/>
+                </RadioButton>
+                <RadioButton x:Name="RailCursor" Style="{StaticResource RailButton}" Tag="PageCursor" Checked="OnRail" ToolTip="Cursor y clics" AutomationProperties.Name="Cursor y clics">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE7C9;" FontSize="18"/>
+                </RadioButton>
+                <RadioButton x:Name="RailCamera" Style="{StaticResource RailButton}" Tag="PageCamera" Checked="OnRail" ToolTip="Cámara" AutomationProperties.Name="Cámara">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE714;" FontSize="18"/>
+                </RadioButton>
+                <RadioButton x:Name="RailAudio" Style="{StaticResource RailButton}" Tag="PageAudio" Checked="OnRail" ToolTip="Audio" AutomationProperties.Name="Audio">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE767;" FontSize="18"/>
+                </RadioButton>
+                <RadioButton x:Name="RailText" Style="{StaticResource RailButton}" Tag="PageText" Checked="OnRail" ToolTip="Texto" AutomationProperties.Name="Texto">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE8D2;" FontSize="18"/>
+                </RadioButton>
+                <RadioButton x:Name="RailSubs" Style="{StaticResource RailButton}" Tag="PageSubs" Checked="OnRail" ToolTip="Subtítulos" AutomationProperties.Name="Subtítulos">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE7F0;" FontSize="18"/>
+                </RadioButton>
+                <RadioButton x:Name="RailAnn" Style="{StaticResource RailButton}" Tag="PageAnn" Checked="OnRail" ToolTip="Anotaciones" AutomationProperties.Name="Anotaciones">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE70F;" FontSize="18"/>
+                </RadioButton>
+                <RadioButton x:Name="RailKeys" Style="{StaticResource RailButton}" Tag="PageKeys" Checked="OnRail" ToolTip="Atajos de teclado" AutomationProperties.Name="Atajos de teclado">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE765;" FontSize="18"/>
+                </RadioButton>
+                <RadioButton x:Name="RailFormat" Style="{StaticResource RailButton}" Tag="PageFormat" Checked="OnRail" ToolTip="Formato y encuadre" AutomationProperties.Name="Formato y encuadre">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE799;" FontSize="18"/>
+                </RadioButton>
+                <RadioButton x:Name="RailExport" Style="{StaticResource RailButton}" Tag="PageExport" Checked="OnRail" ToolTip="Exportación" AutomationProperties.Name="Exportación">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE898;" FontSize="18"/>
+                </RadioButton>
+            </StackPanel>
 
-            <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="Transparent"/>
-
-            <!-- Inspector -->
-            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Padding="4,0,16,12">
-                <StackPanel>
-                    <TextBlock x:Name="SimpleNote" Style="{StaticResource Hint}" Margin="0,0,0,8" Visibility="Collapsed"/>
-                    <TextBlock Style="{StaticResource Section}" Text="Zoom" Margin="0,0,0,6"/>
-                    <WrapPanel>
+            <!-- Settings panel: only the page of the selected tool -->
+            <Border Grid.Column="1" Margin="0,0,12,0" CornerRadius="10" Padding="14,12,6,12"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <DockPanel>
+                    <TextBlock x:Name="PageTitle" DockPanel.Dock="Top" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                    <TextBlock x:Name="SimpleNote" DockPanel.Dock="Top" Style="{StaticResource Hint}" Margin="0,0,8,8" Visibility="Collapsed"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">
+                        <Grid>
+                    <StackPanel x:Name="PageZoom" Visibility="Collapsed" Tag="Zoom">
+                                        <WrapPanel>
                         <Button Content="Regenerar" Click="OnAutoZoom" ToolTip="Vuelve a calcular los zooms automáticos con los ajustes de abajo; los zooms añadidos a mano se conservan"/>
                         <Button Content="Añadir" Click="OnAddZoom" Margin="6,0,0,0" ToolTip="Nuevo zoom de 3 s en el cabezal"/>
                         <Button x:Name="DelZoomBtn" Content="Quitar" Click="OnDeleteZoom" Margin="6,0,0,0"/>
@@ -129,9 +177,62 @@
                             <TextBlock Style="{StaticResource Hint}" Text="Curva: suave al entrar y al salir. Los cambios se aplican al momento a los zooms automáticos; los añadidos a mano no se tocan."/>
                         </StackPanel>
                     </Expander>
-
-                    <StackPanel x:Name="AdvancedTools">
-                    <TextBlock Style="{StaticResource Section}" Text="Texto"/>
+                    </StackPanel>
+                    <StackPanel x:Name="PageCursor" Visibility="Collapsed" Tag="Cursor y clics">
+                    <CheckBox x:Name="ShowClicks" Content="Resaltar clics" Click="OnCursorEdit"/>
+                    <TextBlock Text="Tamaño" Margin="0,6,0,0"/>
+                    <Slider x:Name="RingSize" Minimum="24" Maximum="160" ValueChanged="OnCursorEdit"/>
+                    <TextBlock Text="Duración"/>
+                    <Slider x:Name="RingDuration" Minimum="0.2" Maximum="1.5" ValueChanged="OnCursorEdit"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource Swatch}" Background="#8B5CF6" Tag="#8B5CF6" Click="OnSwatch"/>
+                        <Button Style="{StaticResource Swatch}" Background="#F59E0B" Tag="#F59E0B" Click="OnSwatch"/>
+                        <Button Style="{StaticResource Swatch}" Background="#22C55E" Tag="#22C55E" Click="OnSwatch"/>
+                        <Button Style="{StaticResource Swatch}" Background="#3B82F6" Tag="#3B82F6" Click="OnSwatch"/>
+                        <Button Style="{StaticResource Swatch}" Background="#FFFFFF" Tag="#FFFFFF" Click="OnSwatch"/>
+                    </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="PageCamera" Visibility="Collapsed" Tag="Cámara">
+                    <StackPanel x:Name="CamSection">
+                        <CheckBox x:Name="CamVisible" Content="Mostrar cámara" Click="OnCamEdit"/>
+                        <CheckBox x:Name="CamMirror" Content="Efecto espejo" Click="OnCamEdit" Margin="0,4,0,0"/>
+                        <ComboBox x:Name="CamShape" Margin="0,6,0,0" SelectionChanged="OnCamEdit">
+                            <ComboBoxItem Content="Círculo"/>
+                            <ComboBoxItem Content="Bordes redondeados"/>
+                        </ComboBox>
+                        <TextBlock Text="Tamaño" Margin="0,6,0,0"/>
+                        <Slider x:Name="CamSize" Minimum="0.1" Maximum="0.7" ValueChanged="OnCamEdit"/>
+                        <WrapPanel>
+                            <Button Content="↖" Tag="0.12,0.2" Click="OnCamPreset" Width="36" ToolTip="Superior izquierda"/>
+                            <Button Content="↗" Tag="0.88,0.2" Click="OnCamPreset" Width="36" Margin="6,0,0,0" ToolTip="Superior derecha"/>
+                            <Button Content="↙" Tag="0.12,0.8" Click="OnCamPreset" Width="36" Margin="6,0,0,0" ToolTip="Inferior izquierda"/>
+                            <Button Content="↘" Tag="0.88,0.8" Click="OnCamPreset" Width="36" Margin="6,0,0,0" ToolTip="Inferior derecha"/>
+                            <Button Content="Presentación" Tag="0.75,0.5,0.62" Click="OnCamPreset" Margin="6,0,0,0" ToolTip="Cámara grande a la derecha"/>
+                        </WrapPanel>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Arrastra la cámara en la vista previa para moverla."/>
+                    </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="PageAudio" Visibility="Collapsed" Tag="Audio">
+                    <StackPanel x:Name="MicSection">
+                        <DockPanel>
+                            <CheckBox x:Name="MicMute" Content="Silenciar" DockPanel.Dock="Right" Click="OnAudioEdit"/>
+                            <TextBlock x:Name="MicLabel" Text="Micrófono"/>
+                        </DockPanel>
+                        <Slider x:Name="MicGain" Minimum="-24" Maximum="12" ValueChanged="OnAudioEdit" ToolTip="Ganancia (dB)"/>
+                        <TextBlock x:Name="MicSyncLabel" Style="{StaticResource Hint}"/>
+                        <Slider x:Name="MicSync" Minimum="-1" Maximum="1" ValueChanged="OnAudioEdit" ToolTip="Sincronización manual (s)"/>
+                    </StackPanel>
+                    <StackPanel x:Name="SysSection">
+                        <DockPanel>
+                            <CheckBox x:Name="SysMute" Content="Silenciar" DockPanel.Dock="Right" Click="OnAudioEdit"/>
+                            <TextBlock x:Name="SysLabel" Text="Audio del sistema"/>
+                        </DockPanel>
+                        <Slider x:Name="SysGain" Minimum="-24" Maximum="12" ValueChanged="OnAudioEdit" ToolTip="Ganancia (dB)"/>
+                        <TextBlock x:Name="SysSyncLabel" Style="{StaticResource Hint}"/>
+                        <Slider x:Name="SysSync" Minimum="-1" Maximum="1" ValueChanged="OnAudioEdit" ToolTip="Sincronización manual (s)"/>
+                    </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="PageText" Visibility="Collapsed" Tag="Texto">
                     <WrapPanel>
                         <Button Content="Añadir texto" Click="OnAddText" ToolTip="Texto de 3 s en el cabezal"/>
                         <Button x:Name="DelTextBtn" Content="Quitar" Click="OnDeleteText" Margin="6,0,0,0"/>
@@ -157,8 +258,8 @@
                         </WrapPanel>
                         <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Arrastra el texto en la vista previa para moverlo."/>
                     </StackPanel>
-
-                    <TextBlock Style="{StaticResource Section}" Text="Subtítulos"/>
+                    </StackPanel>
+                    <StackPanel x:Name="PageSubs" Visibility="Collapsed" Tag="Subtítulos">
                     <WrapPanel>
                         <Button Content="Añadir" Click="OnAddCue" ToolTip="Subtítulo en el cabezal"/>
                         <Button x:Name="DelCueBtn" Content="Quitar" Click="OnDeleteCue" Margin="6,0,0,0"/>
@@ -179,8 +280,8 @@
                     <Slider x:Name="SubY" Minimum="0.05" Maximum="0.95" ValueChanged="OnSubStyleEdit"/>
                     <CheckBox x:Name="SubBg" Content="Fondo" Click="OnSubStyleEdit"/>
                     <CheckBox x:Name="SubBurn" Content="Incrustar en el video exportado" Click="OnSubStyleEdit" Margin="0,4,0,0"/>
-
-                    <TextBlock Style="{StaticResource Section}" Text="Anotaciones"/>
+                    </StackPanel>
+                    <StackPanel x:Name="PageAnn" Visibility="Collapsed" Tag="Anotaciones">
                     <WrapPanel>
                         <Button Content="Flecha" Tag="Arrow" Click="OnAddAnn" Margin="0,0,6,6"/>
                         <Button Content="Rectángulo" Tag="Rectangle" Click="OnAddAnn" Margin="0,0,6,6"/>
@@ -209,9 +310,9 @@
                         </WrapPanel>
                     </StackPanel>
                     <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Arrastra la forma en la vista previa para moverla y sus puntos para cambiar el tamaño."/>
-
+                    </StackPanel>
+                    <StackPanel x:Name="PageKeys" Visibility="Collapsed" Tag="Atajos de teclado">
                     <StackPanel x:Name="KeysSection">
-                        <TextBlock Style="{StaticResource Section}" Text="Atajos de teclado"/>
                         <CheckBox x:Name="KeysVisible" Content="Mostrar atajos" Click="OnKeysEdit"/>
                         <ComboBox x:Name="KeysLook" Margin="0,6,0,0" SelectionChanged="OnKeysEdit">
                             <ComboBoxItem Content="Cápsula"/>
@@ -224,64 +325,9 @@
                         <TextBlock x:Name="KeysInfo" Style="{StaticResource Hint}"/>
                         <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0" Text="Arrastra el atajo en la vista previa para moverlo."/>
                     </StackPanel>
-
-                    <TextBlock Style="{StaticResource Section}" Text="Cursor"/>
-                    <CheckBox x:Name="ShowClicks" Content="Resaltar clics" Click="OnCursorEdit"/>
-                    <TextBlock Text="Tamaño" Margin="0,6,0,0"/>
-                    <Slider x:Name="RingSize" Minimum="24" Maximum="160" ValueChanged="OnCursorEdit"/>
-                    <TextBlock Text="Duración"/>
-                    <Slider x:Name="RingDuration" Minimum="0.2" Maximum="1.5" ValueChanged="OnCursorEdit"/>
-                    <StackPanel Orientation="Horizontal">
-                        <Button Style="{StaticResource Swatch}" Background="#8B5CF6" Tag="#8B5CF6" Click="OnSwatch"/>
-                        <Button Style="{StaticResource Swatch}" Background="#F59E0B" Tag="#F59E0B" Click="OnSwatch"/>
-                        <Button Style="{StaticResource Swatch}" Background="#22C55E" Tag="#22C55E" Click="OnSwatch"/>
-                        <Button Style="{StaticResource Swatch}" Background="#3B82F6" Tag="#3B82F6" Click="OnSwatch"/>
-                        <Button Style="{StaticResource Swatch}" Background="#FFFFFF" Tag="#FFFFFF" Click="OnSwatch"/>
                     </StackPanel>
-
-                    </StackPanel>
-                    <StackPanel x:Name="CamSection">
-                        <TextBlock Style="{StaticResource Section}" Text="Cámara"/>
-                        <CheckBox x:Name="CamVisible" Content="Mostrar cámara" Click="OnCamEdit"/>
-                        <CheckBox x:Name="CamMirror" Content="Efecto espejo" Click="OnCamEdit" Margin="0,4,0,0"/>
-                        <ComboBox x:Name="CamShape" Margin="0,6,0,0" SelectionChanged="OnCamEdit">
-                            <ComboBoxItem Content="Círculo"/>
-                            <ComboBoxItem Content="Bordes redondeados"/>
-                        </ComboBox>
-                        <TextBlock Text="Tamaño" Margin="0,6,0,0"/>
-                        <Slider x:Name="CamSize" Minimum="0.1" Maximum="0.7" ValueChanged="OnCamEdit"/>
-                        <WrapPanel>
-                            <Button Content="↖" Tag="0.12,0.2" Click="OnCamPreset" Width="36" ToolTip="Superior izquierda"/>
-                            <Button Content="↗" Tag="0.88,0.2" Click="OnCamPreset" Width="36" Margin="6,0,0,0" ToolTip="Superior derecha"/>
-                            <Button Content="↙" Tag="0.12,0.8" Click="OnCamPreset" Width="36" Margin="6,0,0,0" ToolTip="Inferior izquierda"/>
-                            <Button Content="↘" Tag="0.88,0.8" Click="OnCamPreset" Width="36" Margin="6,0,0,0" ToolTip="Inferior derecha"/>
-                            <Button Content="Presentación" Tag="0.75,0.5,0.62" Click="OnCamPreset" Margin="6,0,0,0" ToolTip="Cámara grande a la derecha"/>
-                        </WrapPanel>
-                        <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Arrastra la cámara en la vista previa para moverla."/>
-                    </StackPanel>
-
-                    <TextBlock Style="{StaticResource Section}" Text="Audio"/>
-                    <StackPanel x:Name="MicSection">
-                        <DockPanel>
-                            <CheckBox x:Name="MicMute" Content="Silenciar" DockPanel.Dock="Right" Click="OnAudioEdit"/>
-                            <TextBlock x:Name="MicLabel" Text="Micrófono"/>
-                        </DockPanel>
-                        <Slider x:Name="MicGain" Minimum="-24" Maximum="12" ValueChanged="OnAudioEdit" ToolTip="Ganancia (dB)"/>
-                        <TextBlock x:Name="MicSyncLabel" Style="{StaticResource Hint}"/>
-                        <Slider x:Name="MicSync" Minimum="-1" Maximum="1" ValueChanged="OnAudioEdit" ToolTip="Sincronización manual (s)"/>
-                    </StackPanel>
-                    <StackPanel x:Name="SysSection">
-                        <DockPanel>
-                            <CheckBox x:Name="SysMute" Content="Silenciar" DockPanel.Dock="Right" Click="OnAudioEdit"/>
-                            <TextBlock x:Name="SysLabel" Text="Audio del sistema"/>
-                        </DockPanel>
-                        <Slider x:Name="SysGain" Minimum="-24" Maximum="12" ValueChanged="OnAudioEdit" ToolTip="Ganancia (dB)"/>
-                        <TextBlock x:Name="SysSyncLabel" Style="{StaticResource Hint}"/>
-                        <Slider x:Name="SysSync" Minimum="-1" Maximum="1" ValueChanged="OnAudioEdit" ToolTip="Sincronización manual (s)"/>
-                    </StackPanel>
-
+                    <StackPanel x:Name="PageFormat" Visibility="Collapsed" Tag="Formato y encuadre">
                     <StackPanel x:Name="FormatSection">
-                    <TextBlock Style="{StaticResource Section}" Text="Formato"/>
                     <ComboBox x:Name="FormatBox" SelectionChanged="OnFormatEdit">
                         <ComboBoxItem Content="Original"/>
                         <ComboBoxItem Content="16:9 horizontal (YouTube, cursos)"/>
@@ -292,8 +338,8 @@
                     <TextBlock x:Name="FramingHint" Style="{StaticResource Hint}" Margin="0,6,0,0"
                                Text="Arrastra el video en la vista previa para encuadrar. Los zooms (también de 1.0×) mueven el encuadre en el tiempo."/>
 
-                    </StackPanel>
-                    <TextBlock Style="{StaticResource Section}" Text="Exportación"/>
+                    </StackPanel>                    </StackPanel>
+                    <StackPanel x:Name="PageExport" Visibility="Collapsed" Tag="Exportación">
                     <ComboBox x:Name="PresetBox" SelectionChanged="OnPreset" ToolTip="Rellena los ajustes de abajo; puedes cambiarlos después">
                         <ComboBoxItem Content="Preset…" IsEnabled="False"/>
                         <ComboBoxItem Content="Rápido"/>
@@ -331,22 +377,64 @@
                         <ComboBoxItem Content="60 FPS" Tag="60"/>
                     </ComboBox>
                     <TextBlock x:Name="ExportInfo" Style="{StaticResource Hint}" Margin="0,6,0,0"/>
-                </StackPanel>
-            </ScrollViewer>
+                    </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- Preview: same layer order as the exporter -->
+            <Border Grid.Column="2" Background="#0D0D12" Margin="0,0,12,0" CornerRadius="10" ClipToBounds="True">
+                <Viewbox Margin="12" Stretch="Uniform">
+                    <Grid x:Name="Stage" ClipToBounds="True" Background="Black" MouseLeftButtonDown="OnStageClick" MouseMove="OnStageMove" MouseLeftButtonUp="OnStageUp">
+                        <Canvas x:Name="ZoomHost" HorizontalAlignment="Left" VerticalAlignment="Top" MouseMove="OnAnnMove" MouseLeftButtonUp="OnAnnUp">
+                            <Canvas.RenderTransform><MatrixTransform x:Name="ZoomTransform"/></Canvas.RenderTransform>
+                            <MediaElement x:Name="ScreenMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Fill" IsMuted="True"/>
+                            <Canvas x:Name="AnnLayer"/>
+                            <Canvas x:Name="RingLayer" IsHitTestVisible="False"/>
+                            <Canvas x:Name="HandleLayer"/>
+                        </Canvas>
+                        <Border x:Name="CamFrame" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="SizeAll"
+                                MouseLeftButtonDown="OnCamDown" MouseMove="OnCamMove" MouseLeftButtonUp="OnCamUp">
+                            <MediaElement x:Name="CamMedia" LoadedBehavior="Manual" ScrubbingEnabled="True" Stretch="Fill"
+                                          IsMuted="True" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                        </Border>
+                        <Canvas x:Name="TextLayer"/>
+                        <Canvas x:Name="KeyLayer"/>
+                    </Grid>
+                </Viewbox>
+            </Border>
+            <MediaElement x:Name="MicMedia" Grid.Column="2" LoadedBehavior="Manual" Width="0" Height="0"/>
+            <MediaElement x:Name="SysMedia" Grid.Column="2" LoadedBehavior="Manual" Width="0" Height="0"/>
         </Grid>
 
         <GridSplitter Grid.Row="2" HorizontalAlignment="Stretch" Background="Transparent"/>
 
         <!-- Transport + timeline -->
         <DockPanel Grid.Row="3" Margin="12,0,12,12">
-            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
-                <Button x:Name="PlayBtn" Content="▶" Width="44" Click="OnPlay" ToolTip="Reproducir / pausar (Espacio)"/>
-                <TextBlock x:Name="TimeText" VerticalAlignment="Center" Margin="12,0" FontFamily="Cascadia Mono, Consolas"/>
-                <Button Content="−" Width="32" Click="OnZoomOutTimeline" ToolTip="Alejar línea de tiempo (Ctrl+−, Ctrl+rueda)"/>
-                <Button Content="+" Width="32" Click="OnZoomInTimeline" Margin="4,0,0,0" ToolTip="Acercar línea de tiempo (Ctrl++, Ctrl+rueda)"/>
-                <Button Content="Ajustar" Click="OnFitTimeline" Margin="4,0,12,0" ToolTip="Ver toda la grabación (Ctrl+0)"/>
-                <TextBlock x:Name="RowsHint" Style="{StaticResource Hint}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-            </DockPanel>
+            <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="UndoBtn" Style="{StaticResource IconButton}" Content="&#xE7A7;" Click="OnUndo" ToolTip="Deshacer (Ctrl+Z)" AutomationProperties.Name="Deshacer"/>
+                    <Button x:Name="RedoBtn" Style="{StaticResource IconButton}" Content="&#xE7A6;" Click="OnRedo" ToolTip="Rehacer (Ctrl+Y)" AutomationProperties.Name="Rehacer" Margin="0,0,12,0"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE8C6;" Click="OnSplit" ToolTip="Dividir en el cabezal (S)" AutomationProperties.Name="Dividir"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE74D;" Click="OnDeleteSegment" ToolTip="Eliminar el tramo bajo el cabezal (Supr)" AutomationProperties.Name="Eliminar tramo"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE76B;" Click="OnMoveClipEarlier" ToolTip="Mover el clip bajo el cabezal un puesto antes (Ctrl+←)" AutomationProperties.Name="Mover clip antes"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE76C;" Click="OnMoveClipLater" ToolTip="Mover el clip bajo el cabezal un puesto después (Ctrl+→)" AutomationProperties.Name="Mover clip después"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="PlayBtn" Content="▶" Width="44" Height="32" Click="OnPlay" ToolTip="Reproducir / pausar (Espacio)"/>
+                    <TextBlock x:Name="TimeText" VerticalAlignment="Center" Margin="12,0,0,0" FontFamily="Cascadia Mono, Consolas"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE946;" Opacity="0.55" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock.ToolTip><TextBlock x:Name="RowsHint" TextWrapping="Wrap" MaxWidth="420"/></TextBlock.ToolTip>
+                    </TextBlock>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE71F;" Click="OnZoomOutTimeline" ToolTip="Alejar línea de tiempo (Ctrl+−, Ctrl+rueda)" AutomationProperties.Name="Alejar línea de tiempo"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE8A3;" Click="OnZoomInTimeline" ToolTip="Acercar línea de tiempo (Ctrl++, Ctrl+rueda)" AutomationProperties.Name="Acercar línea de tiempo"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE9A6;" Click="OnFitTimeline" ToolTip="Ver toda la grabación (Ctrl+0)" AutomationProperties.Name="Ajustar línea de tiempo" Margin="0"/>
+                </StackPanel>
+            </Grid>
             <ScrollBar x:Name="TimelineScroll" DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0" Scroll="OnTimelineScroll" Visibility="Collapsed"/>
             <Border CornerRadius="6" Background="#14141B" ClipToBounds="True">
                 <Canvas x:Name="Timeline" Background="Transparent" SizeChanged="OnTimelineResize"

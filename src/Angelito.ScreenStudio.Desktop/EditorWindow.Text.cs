@@ -22,6 +22,9 @@ public partial class EditorWindow
         _selectedZoom = zoom;
         _selectedText = text;
         _selectedCue = cue;
+        // Selecting something on the timeline opens its tool, like picking it from the rail.
+        var page = zoom >= 0 ? "PageZoom" : text >= 0 ? "PageText" : cue >= 0 ? "PageSubs" : ann >= 0 ? "PageAnn" : null;
+        if (page != null) ShowPage(page);
         if (refresh) Refresh();
     }
 
