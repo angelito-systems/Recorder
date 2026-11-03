@@ -93,7 +93,7 @@
                     <TextBlock x:Name="SimpleNote" Style="{StaticResource Hint}" Margin="0,0,0,8" Visibility="Collapsed"/>
                     <TextBlock Style="{StaticResource Section}" Text="Zoom" Margin="0,0,0,6"/>
                     <WrapPanel>
-                        <Button Content="Auto-zoom" Click="OnAutoZoom" ToolTip="Regenera propuestas a partir de los clics (reemplaza los zooms actuales)"/>
+                        <Button Content="Regenerar" Click="OnAutoZoom" ToolTip="Vuelve a calcular los zooms automáticos con los ajustes de abajo; los zooms añadidos a mano se conservan"/>
                         <Button Content="Añadir" Click="OnAddZoom" Margin="6,0,0,0" ToolTip="Nuevo zoom de 3 s en el cabezal"/>
                         <Button x:Name="DelZoomBtn" Content="Quitar" Click="OnDeleteZoom" Margin="6,0,0,0"/>
                     </WrapPanel>
@@ -101,7 +101,7 @@
                         <TextBlock x:Name="ZoomInfo" Style="{StaticResource Hint}"/>
                         <TextBlock Text="Intensidad" Margin="0,6,0,0"/>
                         <Slider x:Name="ZoomScale" Minimum="1" Maximum="4" ValueChanged="OnZoomEdit" ToolTip="1.0× = solo mover el encuadre"/>
-                        <TextBlock Text="Suavizado (entrada/salida)"/>
+                        <TextBlock Text="Duración de la animación (entrada y salida)"/>
                         <Slider x:Name="ZoomRamp" Minimum="0.1" Maximum="2" ValueChanged="OnZoomEdit"/>
                         <WrapPanel>
                             <Button Content="Inicio = cabezal" Click="OnZoomStartHere"/>
@@ -109,6 +109,26 @@
                         </WrapPanel>
                         <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Haz clic en la vista previa para centrar el zoom seleccionado."/>
                     </StackPanel>
+                    <Expander Header="Zoom automático" Margin="0,10,0,0" IsExpanded="True">
+                        <StackPanel Margin="0,6,0,0">
+                            <CheckBox x:Name="AzEnabled" Content="Zoom al hacer clic" Click="OnAutoZoomSetting" ToolTip="Acercar al hacer clic y volver al 100 % tras la inactividad"/>
+                            <CheckBox x:Name="AzFollow" Content="Seguir al cursor entre regiones" Click="OnAutoZoomSetting" Margin="0,4,0,0"
+                                      ToolTip="Un clic fuera de la zona ampliada desplaza el encuadre en lugar de alejar y volver a acercar"/>
+                            <TextBlock x:Name="AzScaleText" Margin="0,8,0,0"/>
+                            <Slider x:Name="AzScale" Minimum="1.1" Maximum="3" SmallChange="0.1" LargeChange="0.25" ValueChanged="OnAutoZoomSlider"/>
+                            <TextBlock x:Name="AzIdleText"/>
+                            <Slider x:Name="AzIdle" Minimum="0.5" Maximum="6" SmallChange="0.1" LargeChange="0.5" ValueChanged="OnAutoZoomSlider"
+                                    ToolTip="Tiempo sin clics antes de volver al 100 %"/>
+                            <TextBlock x:Name="AzHoldText"/>
+                            <Slider x:Name="AzHold" Minimum="0.3" Maximum="4" SmallChange="0.1" LargeChange="0.5" ValueChanged="OnAutoZoomSlider"
+                                    ToolTip="Tiempo mínimo con el zoom completo, aunque no haya más clics"/>
+                            <TextBlock x:Name="AzInText"/>
+                            <Slider x:Name="AzIn" Minimum="0.15" Maximum="1.5" SmallChange="0.05" LargeChange="0.1" ValueChanged="OnAutoZoomSlider"/>
+                            <TextBlock x:Name="AzOutText"/>
+                            <Slider x:Name="AzOut" Minimum="0.15" Maximum="2" SmallChange="0.05" LargeChange="0.1" ValueChanged="OnAutoZoomSlider"/>
+                            <TextBlock Style="{StaticResource Hint}" Text="Curva: suave al entrar y al salir. Los cambios se aplican al momento a los zooms automáticos; los añadidos a mano no se tocan."/>
+                        </StackPanel>
+                    </Expander>
 
                     <StackPanel x:Name="AdvancedTools">
                     <TextBlock Style="{StaticResource Section}" Text="Texto"/>

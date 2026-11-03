@@ -34,7 +34,7 @@ public partial class EditorWindow
         switch (r)
         {
             case Row.Segment: { var l = P.Segments.ToList(); l[i] = new Segment(s, e); return P with { Segments = l }; }
-            case Row.Zoom: { var l = P.Zooms.ToList(); l[i] = l[i] with { Start = s, End = e }; return P with { Zooms = l }; }
+            case Row.Zoom: { var l = P.Zooms.ToList(); l[i] = l[i] with { Start = s, End = e, Auto = false }; return P with { Zooms = l }; } // edited by hand: regenerating keeps it
             case Row.Text: { var l = P.Texts.ToList(); l[i] = l[i] with { Start = s, End = e }; return P with { Texts = l }; }
             case Row.Annotation: { var l = P.Annotations.ToList(); l[i] = l[i] with { Start = s, End = e }; return P with { Annotations = l }; }
             default: { var l = P.Subtitles.ToList(); l[i] = l[i] with { Start = s, End = e }; return P with { Subtitles = l }; }
@@ -44,7 +44,7 @@ public partial class EditorWindow
     /// <summary>Clips, zooms and subtitles may not overlap their neighbors (lists are kept in time order); texts and annotations can stack.</summary>
     private (double Lo, double Hi) Bounds(Row r, int i)
     {
-        if (r is Row.Text or Row.Annotation) return (0, _duration);
+        if (r is Row.Text or Row.Annotation or Row.Zoom) return (0, _duration); // zooms may overlap: they average, not stack
         var items = Items(r);
         if (r == Row.Segment)
         {

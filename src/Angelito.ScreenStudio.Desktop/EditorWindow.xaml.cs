@@ -133,9 +133,19 @@ public partial class EditorWindow : Window
             var z = p.Zooms[_selectedZoom];
             ZoomScale.Value = z.Scale;
             ZoomRamp.Value = z.Ramp;
-            ZoomInfo.Text = $"Zoom {_selectedZoom + 1}: {Fmt(z.Start)} → {Fmt(z.End)} · {z.Scale:0.0}×";
+            ZoomInfo.Text = ZoomSummary(z, _selectedZoom);
         }
-        else ZoomInfo.Text = p.Zooms.Count == 0 ? "Sin zooms. Usa Auto-zoom o Añadir." : "Selecciona un zoom en la línea de tiempo.";
+        else ZoomInfo.Text = p.Zooms.Count == 0 ? "Sin zooms. Activa el zoom automático o usa Añadir." : "Selecciona un zoom en la línea de tiempo.";
+        var az = p.AutoZoom;
+        AzEnabled.IsChecked = az.Enabled;
+        AzFollow.IsChecked = az.Follow;
+        AzFollow.IsEnabled = AzScale.IsEnabled = AzIdle.IsEnabled = AzHold.IsEnabled = AzIn.IsEnabled = AzOut.IsEnabled = az.Enabled;
+        (AzScale.Value, AzIdle.Value, AzHold.Value, AzIn.Value, AzOut.Value) = (az.Scale, az.IdleReturn, az.MinHold, az.ZoomIn, az.ZoomOut);
+        AzScaleText.Text = $"Zoom por clic: {az.Scale:0.0#}×";
+        AzIdleText.Text = $"Volver al 100 % tras {az.IdleReturn:0.0} s sin clics";
+        AzHoldText.Text = $"Permanencia mínima: {az.MinHold:0.0} s";
+        AzInText.Text = $"Acercamiento: {az.ZoomIn * 1000:0} ms";
+        AzOutText.Text = $"Alejamiento: {az.ZoomOut * 1000:0} ms";
 
         ShowClicks.IsChecked = p.Cursor.ShowClicks;
         RingSize.Value = p.Cursor.Size;
@@ -394,8 +404,9 @@ public partial class EditorWindow : Window
                 Width = Math.Max(4, sp.W), Height = ZoomH, CornerRadius = new CornerRadius(5),
                 Background = new SolidColorBrush(sel ? Color.FromRgb(0x7C, 0x5C, 0xFA) : Color.FromRgb(0x2D, 0x4E, 0xC9)),
                 BorderBrush = sel ? Brushes.White : null, BorderThickness = new Thickness(sel ? 1.5 : 0),
-                Child = new TextBlock { Text = $"Zoom {z.Scale:0.0}×", Foreground = Brushes.White, FontSize = 11, Margin = new Thickness(6, 7, 0, 0) },
+                Child = new TextBlock { Text = $"{(z.Auto ? "Auto" : "Zoom")} {z.Scale:0.0}×", Foreground = Brushes.White, FontSize = 11, Margin = new Thickness(6, 7, 0, 0) },
                 IsHitTestVisible = false,
+                Opacity = z.Auto && !sel ? 0.85 : 1,
             };
             Canvas.SetLeft(r, sp.X);
             Canvas.SetTop(r, ZoomTop);
@@ -421,8 +432,43 @@ public partial class EditorWindow : Window
 
     private void OnAutoZoom(object sender, RoutedEventArgs e)
     {
+        // Projects from before zooms were marked Auto: their old proposals (often one long zoom) look manual.
+        var replaceAll = P.Zooms.Count > 0 && !P.Zooms.Any(z => z.Auto) &&
+            MessageBox.Show(this, "Este proyecto tiene zooms de una versión anterior. ¿Reemplazarlos por los nuevos zooms automáticos?\n\nNo: se conservan y se añaden los automáticos.",
+                App.Product, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        RegenerateAutoZoom(P.AutoZoom, "auto" + Guid.NewGuid(), replaceAll);
+    }
+
+    /// <summary>Replaces the automatic zooms (Auto = true) with fresh ones for these settings; manual zooms are kept.</summary>
+    private void RegenerateAutoZoom(AutoZoomSettings s, string key, bool replaceAll = false)
+    {
         _selectedZoom = -1;
-        Commit(P with { Zooms = AutoZoom.Propose(_cursor, _m.Width, _m.Height, _duration) }, "auto" + Guid.NewGuid());
+        var zooms = P.Zooms.Where(z => !z.Auto && !replaceAll).Concat(AutoZoom.Propose(_cursor, _m.Width, _m.Height, _duration, s)).OrderBy(z => z.Start).ToList();
+        Commit(P with { AutoZoom = s, Zooms = zooms }, key);
+    }
+
+    private void OnAutoZoomSetting(object sender, RoutedEventArgs e)
+    {
+        if (_refreshing) return;
+        RegenerateAutoZoom(P.AutoZoom with { Enabled = AzEnabled.IsChecked == true, Follow = AzFollow.IsChecked == true }, "azset" + Guid.NewGuid());
+    }
+
+    private void OnAutoZoomSlider(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_refreshing) return;
+        RegenerateAutoZoom(P.AutoZoom with
+        {
+            Scale = Math.Round(AzScale.Value, 2), IdleReturn = Math.Round(AzIdle.Value, 1), MinHold = Math.Round(AzHold.Value, 1),
+            ZoomIn = Math.Round(AzIn.Value, 2), ZoomOut = Math.Round(AzOut.Value, 2),
+        }, "azslider"); // one undo step per slider drag
+    }
+
+    /// <summary>Start, duration, region, intensity and curve of a zoom, for the inspector and the timeline tooltip.</summary>
+    private static string ZoomSummary(ZoomSegment z, int i)
+    {
+        var (ri, ro) = ZoomMath.Ramps(z);
+        return $"{(z.Auto ? "Zoom automático" : "Zoom")} {i + 1}: {Fmt(z.Start)} → {Fmt(z.End)} ({z.End - z.Start:0.0} s) · {z.Scale:0.0#}× · " +
+               $"centro {z.X * 100:0}% / {z.Y * 100:0}% · entrada {ri * 1000:0} ms, salida {ro * 1000:0} ms (suave) · luego vuelve a 1.0×";
     }
 
     private void OnAddZoom(object sender, RoutedEventArgs e)
@@ -450,17 +496,15 @@ public partial class EditorWindow : Window
         if (_selectedZoom < 0 || _refreshing) return;
         var zooms = P.Zooms.ToList();
         var z = f(zooms[_selectedZoom]);
-        // keep ordering and no-overlap invariants
-        var prevEnd = _selectedZoom > 0 ? zooms[_selectedZoom - 1].End : 0;
-        var nextStart = _selectedZoom < zooms.Count - 1 ? zooms[_selectedZoom + 1].Start : _duration;
-        z = z with { Start = Math.Clamp(z.Start, prevEnd, nextStart - 0.3), End = Math.Clamp(z.End, prevEnd + 0.3, nextStart) };
+        // Overlaps are safe (weights are averaged, see ZoomMath.Evaluate) and auto-zoom pans rely on them; just stay in range.
+        z = z with { Start = Math.Clamp(z.Start, 0, _duration - 0.3), End = Math.Clamp(z.End, 0.3, _duration), Auto = false };
         if (z.End - z.Start < 0.3) return;
         zooms[_selectedZoom] = z;
         Commit(P with { Zooms = zooms }, key);
     }
 
     private void OnZoomEdit(object sender, RoutedPropertyChangedEventArgs<double> e) =>
-        EditZoom(z => z with { Scale = Math.Round(ZoomScale.Value, 2), Ramp = Math.Round(ZoomRamp.Value, 2) }, "zoomslider");
+        EditZoom(z => z with { Scale = Math.Round(ZoomScale.Value, 2), Ramp = Math.Round(ZoomRamp.Value, 2), RampOut = Math.Round(ZoomRamp.Value, 2) }, "zoomslider");
 
     private void OnZoomStartHere(object sender, RoutedEventArgs e) { var t = Now; EditZoom(z => z with { Start = t }, "zs" + Guid.NewGuid()); }
     private void OnZoomEndHere(object sender, RoutedEventArgs e) { var t = Now; EditZoom(z => z with { End = t }, "ze" + Guid.NewGuid()); }

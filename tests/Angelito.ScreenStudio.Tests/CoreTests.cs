@@ -54,7 +54,8 @@ public class ZoomTests
         Assert.Equal(2, z.Count);
         Assert.InRange(z[0].X, 0.2, 0.23);
         Assert.True(z[0].End < z[1].Start, "segments overlap");
-        Assert.All(z, s => Assert.True(s.End - s.Start >= AutoZoom.MinLength - 1e-9));
+        var d = new AutoZoomSettings();
+        Assert.All(z, s => Assert.True(s.End - s.Start >= d.ZoomIn + d.MinHold + d.ZoomOut - 1e-9));
     }
 
     [Fact]

@@ -30,11 +30,13 @@ public class CanvasTests
 
     /// <summary>Preview/export parity: the rendered frame mid-zoom equals the rectangle the preview shows.</summary>
     [Theory]
-    [InlineData(CanvasAspect.Source, false)]
-    [InlineData(CanvasAspect.Vertical, false)]
-    [InlineData(CanvasAspect.Source, true)]
-    [InlineData(CanvasAspect.Vertical, true)]
-    public async Task ExportMatchesViewRect(CanvasAspect aspect, bool gpu)
+    [InlineData(CanvasAspect.Source, false, false)]
+    [InlineData(CanvasAspect.Vertical, false, false)]
+    [InlineData(CanvasAspect.Source, true, false)]
+    [InlineData(CanvasAspect.Vertical, true, false)]
+    [InlineData(CanvasAspect.Source, false, true)]
+    [InlineData(CanvasAspect.Source, true, true)]
+    public async Task ExportMatchesViewRect(CanvasAspect aspect, bool gpu, bool autoPan = false)
     {
         var vk = gpu ? await EncoderProbe.CameraGpuAsync() : -1;
         if (gpu && vk < 0) return; // no libplacebo/Vulkan GPU faster than the CPU here: the CPU path is what ships
@@ -43,7 +45,11 @@ public class CanvasTests
         var m = new SessionManifest { Width = 1280, Height = 720, Fps = 30, Complete = true };
         var p = new StudioProject
         {
-            Segments = [new(0, 3)], Zooms = [new(0.5, 2.5, 2, 0.7, 0.35, 0.5)],
+            Segments = [new(0, 3)],
+            // autoPan: auto-zoom on two far clicks, so frame 36 (1.2 s) is mid-pan between overlapping, averaged segments.
+            Zooms = autoPan
+                ? AutoZoom.Propose([new(0.5, 200, 150, CursorKind.Left), new(1.4, 1100, 600, CursorKind.Left)], 1280, 720, 3)
+                : [new(0.5, 2.5, 2, 0.7, 0.35, 0.5)],
             Canvas = new ProjectCanvas(aspect, 0.4), Export = new ExportSettings(0, ExportQuality.High),
         };
         var outPath = Path.Combine(dir, "out.mp4");
@@ -57,7 +63,8 @@ public class CanvasTests
             var crop = FormattableString.Invariant($"crop={w:F2}:{h:F2}:{x:F2}:{y:F2}:exact=1,scale={ow}:{oh}:flags=bicubic");
             return await Psnr(outPath, Path.Combine(dir, "screen.mp4"), $"select=eq(n\\,{frame})", $"select=eq(n\\,{frame}),{crop}");
         }
-        var parity = await Compare(36, 36);   // ramping in: position, scale and aspect all moving
+        if (autoPan) Assert.Equal(ZoomState.Tracking, AutoZoom.StateAt(p.Zooms, 36 / 30.0));
+        var parity = await Compare(36, 36);   // ramping in (or panning): position, scale and aspect all moving
         var wrong = await Compare(36, 24);    // the view of a different moment
         Assert.True(parity > 30, $"parity PSNR {parity:F1}");
         Assert.True(parity - wrong > 6, $"test can't tell frames apart ({parity:F1} vs {wrong:F1})");
